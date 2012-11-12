@@ -32,8 +32,9 @@ Getting Started
 
 The Solr River allows to query a running Solr instance and index the returned documents.
 It uses the [SolrJ](http://wiki.apache.org/solr/Solrj) library to communicate with Solr.
-The SolrJ version in use and distributed with the plugin is 3.6.1. Although it's recommended to send queries using the same version that is installed on the Solr server, it's possible to query other Solr versions.
-The default format used is [javabin](http://wiki.apache.org/solr/javabin) but you can solve compatibility issues just switching to the xml format using the wt parameter.
+The SolrJ version in use and distributed with the plugin is 3.6.1.
+Although it's recommended to send queries using the same version that is installed on the Solr server, it's possible to query other Solr versions.
+The default format used is [javabin](http://wiki.apache.org/solr/javabin) but you can solve compatibility issues just switching to the xml format using the wt parameter.  
 All the [common query parameters](http://wiki.apache.org/solr/CommonQueryParameters) are supported.
 
 Installation
@@ -94,7 +95,7 @@ Limitations
 
 License
 =======
-
+```
 This software is licensed under the Apache 2 license, quoted below.
 
 Copyright 2012 Luca Cavanna
@@ -110,3 +111,4 @@ distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
 WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
 License for the specific language governing permissions and limitations under
 the License.
+```
