@@ -31,6 +31,12 @@ Versions
 
 You might be able to use the river with older versions of elasticsearch, but the tests included with the project run successfully only with version 0.19.3 or higher, the first version using Lucene 3.6.
 
+Build status
+------------
+
+[![Build Status](https://buildhive.cloudbees.com/job/javanna/job/elasticsearch-river-solr/badge/icon)](https://buildhive.cloudbees.com/job/javanna/job/elasticsearch-river-solr/)
+[![Build Status](https://travis-ci.org/javanna/elasticsearch-river-solr.png)](https://travis-ci.org/javanna/elasticsearch-river-solr)
+
 Getting Started
 ===============
 
