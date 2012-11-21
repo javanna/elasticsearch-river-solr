@@ -24,10 +24,7 @@ import org.apache.solr.client.solrj.embedded.JettySolrRunner;
 import org.apache.solr.client.solrj.impl.HttpSolrServer;
 import org.elasticsearch.action.admin.cluster.state.ClusterStateRequest;
 import org.elasticsearch.action.admin.indices.refresh.RefreshRequestBuilder;
-import org.elasticsearch.action.get.GetResponse;
-import org.elasticsearch.action.get.MultiGetItemResponse;
-import org.elasticsearch.action.get.MultiGetRequestBuilder;
-import org.elasticsearch.action.get.MultiGetResponse;
+import org.elasticsearch.action.get.*;
 import org.elasticsearch.action.search.SearchRequestBuilder;
 import org.elasticsearch.action.search.SearchResponse;
 import org.elasticsearch.client.Client;
@@ -48,7 +45,6 @@ import org.elasticsearch.index.query.QueryBuilders;
 import org.elasticsearch.node.Node;
 import org.elasticsearch.node.NodeBuilder;
 import org.elasticsearch.river.solr.support.*;
-import org.elasticsearch.search.SearchHit;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testng.Assert;
@@ -120,7 +116,7 @@ public class SolrRiverIntegrationTest {
 
     @BeforeMethod
     public void beforeMethod() throws IOException, SolrServerException {
-        //removes data from elasticsearch (both registered river and imported data)
+        //removes data from elasticsearch (both registered river if existing and imported data)
         String[] indices = esClient.admin().cluster().state(new ClusterStateRequest().local(true))
                 .actionGet().getState().getMetaData().getConcreteAllIndices();
         esClient.admin().indices().prepareDelete(indices).execute().actionGet();
@@ -140,6 +136,7 @@ public class SolrRiverIntegrationTest {
 
         checkMultiGetResponse(documentsMap);
         checkMatchAllDocsSearchResponse(documentsMap);
+        checkRiverClosedOnCompletion();
     }
 
     @Test
@@ -156,6 +153,7 @@ public class SolrRiverIntegrationTest {
 
         checkMultiGetResponse(documentsMap);
         checkMatchAllDocsSearchResponse(documentsMap);
+        checkRiverClosedOnCompletion();
     }
 
     @Test
@@ -170,6 +168,8 @@ public class SolrRiverIntegrationTest {
 
         checkMultiGetResponse(documentsMap);
         checkMatchAllDocsSearchResponse(documentsMap);
+
+        checkRiverClosedOnCompletion();
 
         //for now we test only that the result is the same
         //TODO need to check that the rows param is read (the query sent to Solr actually contains rows=20)
@@ -201,12 +201,14 @@ public class SolrRiverIntegrationTest {
 
         checkMultiGetResponse(expectedDocuments);
         checkMatchAllDocsSearchResponse(expectedDocuments);
+        checkRiverClosedOnCompletion();
     }
 
     @Test
     public void testImportWhenNoDocsReturned() throws Exception {
         registerRiver();
         checkMatchAllDocsSearchResponse(Collections.<String, Iterable<Field>>emptyMap());
+        checkRiverClosedOnCompletion();
     }
 
     @Test
@@ -242,6 +244,7 @@ public class SolrRiverIntegrationTest {
 
         checkMultiGetResponse(expectedDocuments);
         checkMatchAllDocsSearchResponse(expectedDocuments);
+        checkRiverClosedOnCompletion();
     }
 
     @Test
@@ -270,6 +273,7 @@ public class SolrRiverIntegrationTest {
 
         checkMultiGetResponse(expectedDocuments);
         checkMatchAllDocsSearchResponse(documentsMap);
+        checkRiverClosedOnCompletion();
     }
 
     @Test
@@ -323,6 +327,7 @@ public class SolrRiverIntegrationTest {
 
         checkMultiGetResponse(expectedDocuments);
         checkMatchAllDocsSearchResponse(expectedDocuments);
+        checkRiverClosedOnCompletion();
     }
 
     @Test
@@ -337,6 +342,7 @@ public class SolrRiverIntegrationTest {
 
         checkMultiGetResponse(documentsMap, "id_test");
         checkMatchAllDocsSearchResponse(documentsMap);
+        checkRiverClosedOnCompletion();
     }
 
     @Test
@@ -383,6 +389,7 @@ public class SolrRiverIntegrationTest {
                 });
 
         checkSearchResponse(expectedDocumentsMap, searchRequestBuilder);
+        checkRiverClosedOnCompletion();
     }
     
     @Test
@@ -397,6 +404,7 @@ public class SolrRiverIntegrationTest {
 
         checkMultiGetResponse(documentsMap, "myindex", "mytype");
         checkMatchAllDocsSearchResponse(documentsMap, "myindex", "mytype");
+        checkRiverClosedOnCompletion();
     }
 
     @Test
@@ -421,6 +429,7 @@ public class SolrRiverIntegrationTest {
                 .actionGet().getState().metaData().index("solr");
         Assert.assertEquals(indexMetaData.getNumberOfShards(), 1);
         Assert.assertEquals(indexMetaData.getNumberOfReplicas(), 0);
+        checkRiverClosedOnCompletion();
     }
 
     @Test
@@ -435,9 +444,37 @@ public class SolrRiverIntegrationTest {
 
         checkMultiGetResponse(documentsMap);
         checkMatchAllDocsSearchResponse(documentsMap);
+        checkRiverClosedOnCompletion();
 
         //for now we test only that the result is the same
         //TODO need to check that the bulk_size and max_concurrent_bulk param are actually read
+    }
+
+    @Test
+    public void testImportNotClosedOnCompletion() throws Exception {
+
+        Map<String, Iterable<Field>> documentsMap = documentGenerator.generateRandomDocuments();
+        logger.info("Generated {} documents", documentsMap.size());
+        solrIndexer.indexDocuments(documentsMap);
+        logger.info("Indexed {} documents in Solr", documentsMap.size());
+
+        registerRiver(null, null, ImmutableMap.of("close_on_completion", false));
+
+        checkMultiGetResponse(documentsMap);
+        checkMatchAllDocsSearchResponse(documentsMap);
+        checkRiverNotClosedOnCompletion();
+    }
+
+    private void checkRiverClosedOnCompletion() {
+        checkGetResponseNotExisting("_river", "solr_river", "_meta");
+        //we don't want to delete eventual other rivers
+        Assert.assertTrue(esClient.admin().indices().prepareExists("_river").execute().actionGet().exists());
+    }
+
+    private void checkRiverNotClosedOnCompletion() {
+        checkGetResponse("_river", "solr_river", "_meta");
+        //we don't want to delete eventual other rivers
+        Assert.assertTrue(esClient.admin().indices().prepareExists("_river").execute().actionGet().exists());
     }
 
     private void checkMultiGetResponse(Map<String, Iterable<Field>> expectedDocumentsMap) {
@@ -450,6 +487,18 @@ public class SolrRiverIntegrationTest {
 
     private void checkMultiGetResponse(Map<String, Iterable<Field>> expectedDocumentsMap, String index, String type) {
         checkMultiGetResponse(expectedDocumentsMap, index, type, SolrRiver.DEFAULT_UNIQUE_KEY);
+    }
+
+    private void checkGetResponse(String index, String type, String id) {
+        GetRequestBuilder getRequestBuilder = new GetRequestBuilder(esClient).setIndex(index).setType(type).setId(id);
+        GetResponse getResponse = requestExecutor.tryExecute(getRequestBuilder, new CheckGetResponseCallback());
+        Assert.assertTrue(getResponse.exists());
+    }
+
+    private void checkGetResponseNotExisting(String index, String type, String id) {
+        GetRequestBuilder getRequestBuilder = new GetRequestBuilder(esClient).setIndex(index).setType(type).setId(id);
+        GetResponse getResponse = requestExecutor.tryExecute(getRequestBuilder, new CheckGetResponseNotExistingCallback());
+        Assert.assertFalse(getResponse.exists());
     }
 
     private void checkMultiGetResponse(Map<String, Iterable<Field>> expectedDocumentsMap,
@@ -532,13 +581,26 @@ public class SolrRiverIntegrationTest {
     }
 
     private void registerRiver() throws Exception {
-        registerRiver(null, null);
+        registerRiver(null, null, null);
     }
 
     private void registerRiver(Map<String, ? extends Object> solrConfig,
                                Map<String, ? extends Object> indexConfig) throws Exception {
+        registerRiver(solrConfig, indexConfig, null);
+    }
+
+    private void registerRiver(Map<String, ? extends Object> solrConfig,
+                               Map<String, ? extends Object> indexConfig,
+                               Map<String, ? extends Object> mainConfig) throws Exception {
         XContentBuilder builder = XContentFactory.jsonBuilder().prettyPrint().startObject();
         builder.field("type", "solr");
+
+        if (mainConfig != null) {
+            for (Map.Entry<String, ? extends Object> entry : mainConfig.entrySet()) {
+                builder.field(entry.getKey(), entry.getValue());
+            }
+        }
+
         builder.startObject("solr");
         builder.field("url", "http://localhost:8983/solr-river/");
         if (solrConfig != null) {

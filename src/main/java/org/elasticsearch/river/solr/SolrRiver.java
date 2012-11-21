@@ -19,10 +19,7 @@
 package org.elasticsearch.river.solr;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.SerializationConfig;
 import com.fasterxml.jackson.databind.SerializationFeature;
-import org.apache.http.client.HttpClient;
-import org.apache.http.impl.client.DefaultHttpClient;
 import org.apache.solr.client.solrj.SolrQuery;
 import org.apache.solr.client.solrj.SolrServer;
 import org.apache.solr.client.solrj.SolrServerException;
@@ -31,7 +28,6 @@ import org.apache.solr.client.solrj.impl.XMLResponseParser;
 import org.apache.solr.client.solrj.response.QueryResponse;
 import org.apache.solr.common.SolrDocument;
 import org.apache.solr.common.SolrDocumentList;
-import org.elasticsearch.ExceptionsHelper;
 import org.elasticsearch.action.ActionListener;
 import org.elasticsearch.action.admin.indices.create.CreateIndexRequestBuilder;
 import org.elasticsearch.action.bulk.BulkRequestBuilder;
@@ -39,10 +35,7 @@ import org.elasticsearch.action.bulk.BulkResponse;
 import org.elasticsearch.client.Client;
 import org.elasticsearch.client.Requests;
 import org.elasticsearch.common.inject.Inject;
-import org.elasticsearch.common.settings.ImmutableSettings;
-import org.elasticsearch.common.settings.Settings;
 import org.elasticsearch.common.xcontent.support.XContentMapValues;
-import org.elasticsearch.indices.IndexAlreadyExistsException;
 import org.elasticsearch.river.AbstractRiverComponent;
 import org.elasticsearch.river.River;
 import org.elasticsearch.river.RiverName;
@@ -54,7 +47,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.concurrent.atomic.AtomicLong;
 
 /**
  * Solr river which allows to index data taken from a running Solr instance
@@ -78,6 +70,7 @@ public class SolrRiver extends AbstractRiverComponent implements River {
     private final int bulkSize;
     private final String settings;
     private final String mapping;
+    private final boolean closeOnCompletion;
 
     private volatile BulkRequestBuilder bulkRequest;
     private AtomicInteger start = new AtomicInteger(0);
@@ -91,6 +84,8 @@ public class SolrRiver extends AbstractRiverComponent implements River {
         super(riverName, riverSettings);
         this.client = client;
 
+        this.closeOnCompletion = XContentMapValues.nodeBooleanValue(riverSettings.settings().get("close_on_completion"), true);
+
         String url = "http://localhost:8983/solr/";
         String q = "*:*";
         String uniqueKey = DEFAULT_UNIQUE_KEY;
@@ -99,7 +94,6 @@ public class SolrRiver extends AbstractRiverComponent implements River {
         wt = qt = null;
         String[] fq, fl;
         fq = fl = null;
-
         if (riverSettings.settings().containsKey("solr")) {
             Map<String, Object> solrSettings = (Map<String, Object>) riverSettings.settings().get("solr");
             url = XContentMapValues.nodeStringValue(solrSettings.get("url"), url);
@@ -237,6 +231,11 @@ public class SolrRiver extends AbstractRiverComponent implements River {
         }
 
         logger.info("Data import from solr to elasticsearch completed");
+
+        if (closeOnCompletion) {
+            logger.info("Deleting river");
+            client.admin().indices().prepareDeleteMapping("_river").setType(riverName.name()).execute();
+        }
     }
 
     protected SolrServer createSolrServer() {
