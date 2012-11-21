@@ -36,9 +36,9 @@ Getting Started
 
 The Solr River allows to query a running Solr instance and index the returned documents in elasticsearch.
 It uses the [Solrj](http://wiki.apache.org/solr/Solrj) library to communicate with Solr.
-The Solrj version in use and distributed with the plugin is 3.6.1.
 
-It's recommended that the solrj version used the query is the same as the solr version installed on the server. Anyway, it's possible to query other Solr versions.
+It's recommended that the solrj version used is the same as the solr version installed on the server that the river is querying.
+The Solrj version in use and distributed with the plugin is 3.6.1. Anyway, it's possible to query other Solr versions.
 The default format used is in fact [javabin](http://wiki.apache.org/solr/javabin) but you can solve compatibility issues just switching to the xml format using the wt parameter.
 
 All the [common query parameters](http://wiki.apache.org/solr/CommonQueryParameters) are supported.
