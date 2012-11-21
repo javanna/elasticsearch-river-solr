@@ -34,12 +34,18 @@ You might be able to use the river with older versions of elasticsearch, but the
 Getting Started
 ===============
 
-The Solr River allows to query a running Solr instance and index the returned documents.
-It uses the [SolrJ](http://wiki.apache.org/solr/Solrj) library to communicate with Solr.
-The SolrJ version in use and distributed with the plugin is 3.6.1.
-Although it's recommended to send queries using the same version that is installed on the Solr server, it's possible to query other Solr versions.
-The default format used is [javabin](http://wiki.apache.org/solr/javabin) but you can solve compatibility issues just switching to the xml format using the wt parameter.  
+The Solr River allows to query a running Solr instance and index the returned documents in elasticsearch.
+It uses the [Solrj](http://wiki.apache.org/solr/Solrj) library to communicate with Solr.
+The Solrj version in use and distributed with the plugin is 3.6.1.
+
+It's recommended that the solrj version used the query is the same as the solr version installed on the server. Anyway, it's possible to query other Solr versions.
+The default format used is in fact [javabin](http://wiki.apache.org/solr/javabin) but you can solve compatibility issues just switching to the xml format using the wt parameter.
+
 All the [common query parameters](http://wiki.apache.org/solr/CommonQueryParameters) are supported.
+
+The solr river is not meant to keep solr and elasticsearch in sync, that's why it automatically deletes itself on completion, so that the river doesn't start up again at every node restart.
+This is the default behaviour, which can be disabled through the close_on_completion parameter.
+
 
 Installation
 ------------
@@ -57,11 +63,12 @@ curl -XPUT localhost:9200/_river/solr_river/_meta -d '
 }'
 ```
 
-All parameters are optional. The following example request contains all the possible parameters that you can use together with all the default values.
+All supported parameters are optional. The following example request contains all the parameters that are supported together with the corresponding default values applied when not present.
 
 ```javascript
 {
     "type" : "solr",
+    "close_on_completion" : "true",
     "solr" : {
         "url" : "http://localhost:8983/solr/",
         "q" : "*:*",
@@ -84,8 +91,11 @@ All parameters are optional. The following example request contains all the poss
 ```
 
 The fq and fl parameters can be provided as either an array or a single value.
+
 You can provide your own mapping while creating the river, as well as the index settings, which will be used when creating the new index if needed.
-The index is created when not already existing, otherwise the documents are added to the existing one.
+
+The index is created when not already existing, otherwise the documents are added to the existing one with the configured name.
+
 The documents are indexed using the [bulk api](http://www.elasticsearch.org/guide/reference/java-api/bulk.html).
 You can control the size of each bulk (default 100) and the maximum number of concurrent bulk operations (default is 10).
 Once the limit is reached the indexing will slow down, waiting for one of the bulk operations to finish its work; no documents will be lost.
