@@ -1,0 +1,8 @@
+Version: 1.0.1
+Date: 21/11/2012
+Changes:
+* Added close_on_completion option (default true) to automatically delete the river at the end of the data import process
+
+Version: 1.0.0
+Date: 12/11/2012
+* First release
