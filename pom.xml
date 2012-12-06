@@ -24,7 +24,7 @@
     </scm>
 
     <properties>
-        <elasticsearch.version>0.19.11</elasticsearch.version>
+        <elasticsearch.version>0.19.12</elasticsearch.version>
         <!-- must match the lucene version used by elasticsearch
              solrj and solr-core (only for testing)  -->
         <solr.version>3.6.1</solr.version>
