@@ -28,9 +28,9 @@ import org.apache.solr.client.solrj.impl.XMLResponseParser;
 import org.apache.solr.client.solrj.response.QueryResponse;
 import org.apache.solr.common.SolrDocument;
 import org.apache.solr.common.SolrDocumentList;
-import org.elasticsearch.action.ActionListener;
 import org.elasticsearch.action.admin.indices.create.CreateIndexRequestBuilder;
-import org.elasticsearch.action.bulk.BulkRequestBuilder;
+import org.elasticsearch.action.bulk.BulkProcessor;
+import org.elasticsearch.action.bulk.BulkRequest;
 import org.elasticsearch.action.bulk.BulkResponse;
 import org.elasticsearch.client.Client;
 import org.elasticsearch.client.Requests;
@@ -45,7 +45,6 @@ import java.io.IOException;
 import java.io.StringWriter;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.Semaphore;
 import java.util.concurrent.atomic.AtomicInteger;
 
 /**
@@ -67,14 +66,12 @@ public class SolrRiver extends AbstractRiverComponent implements River {
 
     private final String indexName;
     private final String typeName;
-    private final int bulkSize;
     private final String settings;
     private final String mapping;
     private final boolean closeOnCompletion;
 
-    private volatile BulkRequestBuilder bulkRequest;
+    private volatile BulkProcessor bulkProcessor;
     private AtomicInteger start = new AtomicInteger(0);
-    private Semaphore bulkSemaphore;
 
     static final String DEFAULT_UNIQUE_KEY = "id";
 
@@ -133,8 +130,23 @@ public class SolrRiver extends AbstractRiverComponent implements River {
         this.mapping = mapping;
         this.indexName = index;
         this.typeName = type;
-        this.bulkSize = bulkSize;
-        this.bulkSemaphore = new Semaphore(maxConcurrentBulk);
+
+        this.bulkProcessor = BulkProcessor.builder(client, new BulkProcessor.Listener() {
+            @Override
+            public void beforeBulk(long executionId, BulkRequest request) {
+                logger.info("Going to execute new bulk composed of {} actions", request.numberOfActions());
+            }
+
+            @Override
+            public void afterBulk(long executionId, BulkRequest request, BulkResponse response) {
+                logger.info("Executed bulk composed of {} actions", request.numberOfActions());
+            }
+
+            @Override
+            public void afterBulk(long executionId, BulkRequest request, Throwable failure) {
+                logger.warn("Error executing bulk", failure);
+            }
+        }).setBulkActions(bulkSize).setConcurrentRequests(maxConcurrentBulk).build();
     }
 
     private String[] readArrayOrString(Object node) {
@@ -173,8 +185,6 @@ public class SolrRiver extends AbstractRiverComponent implements River {
             createIndexRequest.execute().actionGet();
         }
 
-        bulkRequest = client.prepareBulk();
-
         SolrServer solrServer = createSolrServer();
         SolrQuery solrQuery = createSolrQuery();
 
@@ -203,10 +213,7 @@ public class SolrRiver extends AbstractRiverComponent implements River {
                             solrDocument.remove(uniqueKey);
                             StringWriter jsonWriter = new StringWriter();
                             mapper.writeValue(jsonWriter, solrDocument);
-                            bulkRequest.add(Requests.indexRequest(indexName).type(typeName).id(id).source(jsonWriter.toString()));
-                            if (bulkRequest.numberOfActions() >= bulkSize) {
-                                processBulk();
-                            }
+                            bulkProcessor.add(Requests.indexRequest(indexName).type(typeName).id(id).source(jsonWriter.toString()));
                         } else {
                             if (idObject == null) {
                                 logger.error("The uniqueKey value is null");
@@ -225,10 +232,7 @@ public class SolrRiver extends AbstractRiverComponent implements River {
             }
         }
 
-        if (bulkRequest.numberOfActions() > 0) {
-            logger.debug("Executing last bulk with {} actions", bulkRequest.numberOfActions());
-            processBulk();
-        }
+        bulkProcessor.close();
 
         logger.info("Data import from solr to elasticsearch completed");
 
@@ -263,40 +267,6 @@ public class SolrRiver extends AbstractRiverComponent implements River {
         }
         solrQuery.setRows(rows);
         return solrQuery;
-    }
-
-    private void processBulk() {
-
-        try {
-            //Depending on max_concurrent_bulk we slow down the data import if there are too many concurrent bulks going on
-            logger.debug("Waiting to acquire a permit to execute the bulk");
-            bulkSemaphore.acquire();
-            logger.debug("Acquired permit to execute the bulk ({} remaining permits)", bulkSemaphore.availablePermits());
-
-            try {
-                bulkRequest.execute(new ActionListener<BulkResponse>() {
-                    @Override
-                    public void onResponse(BulkResponse bulkResponse) {
-                        bulkSemaphore.release();
-                    }
-
-                    @Override
-                    public void onFailure(Throwable e) {
-                        logger.warn("Failed to execute bulk", e);
-                        bulkSemaphore.release();
-                    }
-                });
-            } catch (Exception e) {
-                logger.warn("Error executing bulk", e);
-                bulkSemaphore.release();
-            }
-
-            bulkRequest = client.prepareBulk();
-
-        } catch (InterruptedException e) {
-            logger.error(e.getMessage(), e);
-        }
-
     }
 
     @Override

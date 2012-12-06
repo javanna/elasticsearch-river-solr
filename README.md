@@ -19,7 +19,7 @@ Versions
 	<tbody>
 		<tr>
 			<td>master</td>
-			<td>0.19.3 -> 0.19.12</td>
+			<td>0.19.9 -> 0.19.12</td>
 		</tr>
 		<tr>
             <td>1.0.1</td>
