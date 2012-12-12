@@ -30,14 +30,14 @@ public class RequestExecutor {
 
     private static final long DEFAULT_MAX_WAIT_TIME = 5000;
 
-    public <Request extends ActionRequest, Response extends ActionResponse> Response
-        tryExecute(ActionRequestBuilder<Request, Response> actionRequestBuilder,
+    public <Request extends ActionRequest, Response extends ActionResponse, RequestBuilder extends ActionRequestBuilder> Response
+        tryExecute(ActionRequestBuilder<Request, Response, RequestBuilder> actionRequestBuilder,
                CheckResponseCallback<Response> checkResponseCallback) {
         return tryExecute(actionRequestBuilder, DEFAULT_MAX_WAIT_TIME, checkResponseCallback);
     }
 
-    public <Request extends ActionRequest, Response extends ActionResponse> Response
-            tryExecute(ActionRequestBuilder<Request, Response> actionRequestBuilder,
+    public <Request extends ActionRequest, Response extends ActionResponse, RequestBuilder extends ActionRequestBuilder> Response
+            tryExecute(ActionRequestBuilder<Request, Response, RequestBuilder> actionRequestBuilder,
                     long maxWaitTime,
                     CheckResponseCallback<Response> checkResponseCallback) {
 
