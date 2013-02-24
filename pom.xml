@@ -25,7 +25,7 @@
 
     <distributionManagement>
         <repository>
-            <id>bintray-javanna-elasticsearch-tools-elasticsearch-river-solr</id>
+            <id>bintray-javanna</id>
             <name>javanna-elasticsearch-tools-elasticsearch-river-solr</name>
             <url>https://api.bintray.com/maven/javanna/elasticsearch-tools/elasticsearch-river-solr/release</url>
         </repository>
