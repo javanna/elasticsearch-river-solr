@@ -6,7 +6,7 @@
 
     <groupId>org.elasticsearch</groupId>
     <artifactId>elasticsearch-river-solr</artifactId>
-    <version>1.0.2-SNAPSHOT</version>
+    <version>1.0.2</version>
     <packaging>jar</packaging>
     <description>Solr River for ElasticSearch</description>
     <inceptionYear>2012</inceptionYear>
@@ -23,8 +23,16 @@
         <url>http://github.com/javanna/elasticsearch-river-solr</url>
     </scm>
 
+    <distributionManagement>
+        <repository>
+            <id>bintray-javanna-elasticsearch-tools-elasticsearch-river-solr</id>
+            <name>javanna-elasticsearch-tools-elasticsearch-river-solr</name>
+            <url>https://api.bintray.com/maven/javanna/elasticsearch-tools/elasticsearch-river-solr/release</url>
+        </repository>
+    </distributionManagement>
+
     <properties>
-        <elasticsearch.version>0.20.0</elasticsearch.version>
+        <elasticsearch.version>0.20.5</elasticsearch.version>
         <!-- must match the lucene version used by elasticsearch
              solrj and solr-core (only for testing)  -->
         <solr.version>3.6.1</solr.version>

@@ -18,8 +18,8 @@ Versions
 	</thead>
 	<tbody>
 		<tr>
-			<td>master</td>
-			<td>0.20.0 -> master</td>
+			<td>1.0.2</td>
+			<td>0.20.0 -> 0.20.5</td>
 		</tr>
 		<tr>
             <td>1.0.1</td>
