@@ -3,7 +3,8 @@ Solr River Plugin for ElasticSearch [![Build Status](https://buildhive.cloudbees
 
 The Solr River plugin allows to import data from [Apache Solr](http://lucene.apache.org/solr) to [elasticsearch](http://www.elasticsearch.org).
 
-In order to install the plugin, simply run: `bin/plugin install river-solr -url http://www.javanna.net/downloads/elasticsearch-river-solr-1.0.1.zip`.
+In order to install the latest version of the plugin, simply run: `bin/plugin install river-solr -url http://bit.ly/15cCMIB`.
+You can copy paste the url of a specific version from the table below, depending on the elasticsearch version you're running.
 
 
 Versions
@@ -18,15 +19,15 @@ Versions
 	</thead>
 	<tbody>
 		<tr>
-			<td>1.0.2</td>
+			<td><a href="http://bit.ly/15cCMIB">1.0.2</a></td>
 			<td>0.20.0 -> 0.20.5</td>
 		</tr>
 		<tr>
-            <td>1.0.1</td>
+            <td><a href="http://bit.ly/Yo61UW">1.0.1</a></td>
             <td>0.19.3 -> 0.19.12</td>
         </tr>
 		<tr>
-            <td>1.0.0</td>
+            <td><a href="http://bit.ly/XUl2LZ">1.0.0</a></td>
         	<td>0.19.3 -> 0.19.12</td>
         </tr>
 	</tbody>
