@@ -18,6 +18,10 @@ Versions
 		</tr>
 	</thead>
 	<tbody>
+	    <tr>
+    	    <td><a href="http://bit.ly/12rmrSN">1.0.3</a></td>
+    		<td>0.20.0 -> 0.20.5</td>
+        </tr>
 		<tr>
 			<td><a href="http://bit.ly/15cCMIB">1.0.2</a></td>
 			<td>0.20.0 -> 0.20.5</td>
@@ -104,6 +108,30 @@ The index is created when not already existing, otherwise the documents are adde
 The documents are indexed using the [bulk api](http://www.elasticsearch.org/guide/reference/java-api/bulk.html).
 You can control the size of each bulk (default 100) and the maximum number of concurrent bulk operations (default is 10).
 Once the limit is reached the indexing will slow down, waiting for one of the bulk operations to finish its work; no documents will be lost.
+
+Since version 1.0.3 it's possible to transform the documents via scripting. The feature works exactly as the [update api](http://www.elasticsearch.org/guide/reference/api/update.html). The needed parameters can be specified within the transform section while registering the river, like this:
+
+```javascript
+{
+    "type" : "solr",
+    "solr" : {
+        "url" : "http://localhost:8983/solr/",
+        "q" : "*:*",
+    },
+    "index" : {
+        "index" : "solr",
+        "type" : "import",
+    },
+    "transform" : {
+        "script" : "ctx._source.counter += count",
+        "params" : {
+            "count" : 4
+        }
+    }
+}
+```
+
+The example above increments by 4 the content of the counter field for every document right before the indexing process in elasticsearch.
 
 Limitations
 ------------
