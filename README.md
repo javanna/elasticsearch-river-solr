@@ -109,6 +109,8 @@ The documents are indexed using the [bulk api](http://www.elasticsearch.org/guid
 You can control the size of each bulk (default 100) and the maximum number of concurrent bulk operations (default is 10).
 Once the limit is reached the indexing will slow down, waiting for one of the bulk operations to finish its work; no documents will be lost.
 
+Transform documents
+------------
 Since version 1.0.3 it's possible to transform the documents via scripting. The feature works exactly as the [update api](http://www.elasticsearch.org/guide/reference/api/update.html). The needed parameters can be specified within the transform section while registering the river, like this:
 
 ```javascript
