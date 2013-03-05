@@ -28,21 +28,31 @@ import org.apache.solr.client.solrj.impl.XMLResponseParser;
 import org.apache.solr.client.solrj.response.QueryResponse;
 import org.apache.solr.common.SolrDocument;
 import org.apache.solr.common.SolrDocumentList;
+import org.elasticsearch.ElasticSearchIllegalArgumentException;
 import org.elasticsearch.action.admin.indices.create.CreateIndexRequestBuilder;
 import org.elasticsearch.action.bulk.BulkProcessor;
 import org.elasticsearch.action.bulk.BulkRequest;
 import org.elasticsearch.action.bulk.BulkResponse;
+import org.elasticsearch.action.index.IndexRequest;
 import org.elasticsearch.client.Client;
 import org.elasticsearch.client.Requests;
+import org.elasticsearch.common.collect.Maps;
+import org.elasticsearch.common.collect.Tuple;
 import org.elasticsearch.common.inject.Inject;
+import org.elasticsearch.common.xcontent.XContentHelper;
+import org.elasticsearch.common.xcontent.XContentType;
 import org.elasticsearch.common.xcontent.support.XContentMapValues;
 import org.elasticsearch.river.AbstractRiverComponent;
 import org.elasticsearch.river.River;
 import org.elasticsearch.river.RiverName;
 import org.elasticsearch.river.RiverSettings;
+import org.elasticsearch.script.ExecutableScript;
+import org.elasticsearch.script.ScriptService;
 
 import java.io.IOException;
 import java.io.StringWriter;
+import java.nio.charset.Charset;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -53,6 +63,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 public class SolrRiver extends AbstractRiverComponent implements River {
 
     private final Client client;
+    private final ScriptService scriptService;
 
     private final String solrUrl;
 
@@ -70,6 +81,10 @@ public class SolrRiver extends AbstractRiverComponent implements River {
     private final String mapping;
     private final boolean closeOnCompletion;
 
+    private final String script;
+    private final Map<String, Object> scriptParams;
+    private final String scriptLang;
+
     private volatile BulkProcessor bulkProcessor;
     private AtomicInteger start = new AtomicInteger(0);
 
@@ -77,9 +92,10 @@ public class SolrRiver extends AbstractRiverComponent implements River {
 
 
     @Inject
-    protected SolrRiver(RiverName riverName, RiverSettings riverSettings, Client client) {
+    protected SolrRiver(RiverName riverName, RiverSettings riverSettings, Client client, ScriptService scriptService) {
         super(riverName, riverSettings);
         this.client = client;
+        this.scriptService = scriptService;
 
         this.closeOnCompletion = XContentMapValues.nodeBooleanValue(riverSettings.settings().get("close_on_completion"), true);
 
@@ -130,6 +146,19 @@ public class SolrRiver extends AbstractRiverComponent implements River {
         this.mapping = mapping;
         this.indexName = index;
         this.typeName = type;
+
+        String script = null;
+        Map<String, Object> scriptParams = Maps.newHashMap();
+        String scriptLang = null;
+        if (riverSettings.settings().containsKey("transform")) {
+            Map<String, Object> transformSettings = (Map<String, Object>) riverSettings.settings().get("transform");
+            script = XContentMapValues.nodeStringValue(transformSettings.get("script"), null);
+            scriptLang = XContentMapValues.nodeStringValue(transformSettings.get("lang"), null);
+            scriptParams = (Map<String, Object>) transformSettings.get("params");
+        }
+        this.script = script;
+        this.scriptParams = scriptParams;
+        this.scriptLang = scriptLang;
 
         this.bulkProcessor = BulkProcessor.builder(client, new BulkProcessor.Listener() {
             @Override
@@ -213,7 +242,16 @@ public class SolrRiver extends AbstractRiverComponent implements River {
                             solrDocument.remove(uniqueKey);
                             StringWriter jsonWriter = new StringWriter();
                             mapper.writeValue(jsonWriter, solrDocument);
-                            bulkProcessor.add(Requests.indexRequest(indexName).type(typeName).id(id).source(jsonWriter.toString()));
+
+                            IndexRequest indexRequest = Requests.indexRequest(indexName).type(typeName).id(id);
+                            if (this.script == null) {
+                                indexRequest.source(jsonWriter.toString());
+                            } else {
+                                Tuple<XContentType, Map<String, Object>> newSourceAndContent = transformDocument(jsonWriter.toString());
+                                indexRequest.source(newSourceAndContent.v2(), newSourceAndContent.v1());
+                            }
+
+                            bulkProcessor.add(indexRequest);
                         } else {
                             if (idObject == null) {
                                 logger.error("The uniqueKey value is null");
@@ -240,6 +278,25 @@ public class SolrRiver extends AbstractRiverComponent implements River {
             logger.info("Deleting river");
             client.admin().indices().prepareDeleteMapping("_river").setType(riverName.name()).execute();
         }
+    }
+
+    protected Tuple<XContentType, Map<String, Object>> transformDocument(String jsonDocument) {
+        Tuple<XContentType, Map<String, Object>> sourceAndContent = XContentHelper.convertToMap(jsonDocument.getBytes(Charset.forName("utf-8")), true);
+
+        Map<String, Object> ctx = new HashMap<String, Object>(2);
+        ctx.put("_source", sourceAndContent.v2());
+
+        try {
+            ExecutableScript executableScript = scriptService.executable(scriptLang, script, scriptParams);
+            executableScript.setNextVar("ctx", ctx);
+            executableScript.run();
+            ctx = (Map<String, Object>) executableScript.unwrap(ctx);
+        } catch (Exception e) {
+            throw new ElasticSearchIllegalArgumentException("failed to execute script", e);
+        }
+
+        final Map<String, Object> updatedSourceAsMap = (Map<String, Object>) ctx.get("_source");
+        return new Tuple<XContentType, Map<String, Object>>(sourceAndContent.v1(), updatedSourceAsMap);
     }
 
     protected SolrServer createSolrServer() {

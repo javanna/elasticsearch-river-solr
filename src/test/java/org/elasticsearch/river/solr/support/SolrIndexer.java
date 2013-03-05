@@ -23,11 +23,7 @@ import org.apache.solr.client.solrj.SolrServerException;
 import org.apache.solr.common.SolrInputDocument;
 
 import java.io.IOException;
-import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
-
-import static org.elasticsearch.river.solr.support.Random.nextInt;
 
 public class SolrIndexer {
 

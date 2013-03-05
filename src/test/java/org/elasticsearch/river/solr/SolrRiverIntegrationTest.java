@@ -391,7 +391,7 @@ public class SolrRiverIntegrationTest {
         checkSearchResponse(expectedDocumentsMap, searchRequestBuilder);
         checkRiverClosedOnCompletion();
     }
-    
+
     @Test
     public void testImportWithIndexAndType() throws Exception {
 
@@ -463,6 +463,65 @@ public class SolrRiverIntegrationTest {
         checkMultiGetResponse(documentsMap);
         checkMatchAllDocsSearchResponse(documentsMap);
         checkRiverNotClosedOnCompletion();
+    }
+
+    @Test
+    public void testImportWithScript() throws Exception {
+
+        Map<String, Iterable<Field>> documentsMap = documentGenerator.generateRandomDocuments();
+        logger.info("Generated {} documents", documentsMap.size());
+        solrIndexer.indexDocuments(documentsMap);
+        logger.info("Indexed {} documents in Solr", documentsMap.size());
+
+        //running a script that always removes the title field
+
+        Map<String, Iterable<Field>> expectedDocuments = Maps.transformValues(documentsMap, new Function<Iterable<Field>, Iterable<Field>>() {
+            @Override
+            public Iterable<Field> apply(Iterable<Field> fields) {
+                return Iterables.filter(fields, new Predicate<Field>() {
+                    @Override
+                    public boolean apply(Field field) {
+                        return !"title".equals(field.getName());
+                    }
+                });
+            }
+        });
+
+        registerRiver(null, null, null, ImmutableMap.of("script", "ctx._source.remove(\"title\")"));
+
+        checkMultiGetResponse(expectedDocuments);
+        checkMatchAllDocsSearchResponse(expectedDocuments);
+        checkRiverClosedOnCompletion();
+    }
+
+    @Test
+    public void testImportWithScriptAndParams() throws Exception {
+
+        Map<String, Iterable<Field>> documentsMap = documentGenerator.generateRandomDocuments();
+        logger.info("Generated {} documents", documentsMap.size());
+        solrIndexer.indexDocuments(documentsMap);
+        logger.info("Indexed {} documents in Solr", documentsMap.size());
+
+        //running a script that always removes the title field
+
+        Map<String, Iterable<Field>> expectedDocuments = Maps.transformValues(documentsMap, new Function<Iterable<Field>, Iterable<Field>>() {
+            @Override
+            public Iterable<Field> apply(Iterable<Field> fields) {
+                return Iterables.filter(fields, new Predicate<Field>() {
+                    @Override
+                    public boolean apply(Field field) {
+                        return !"title".equals(field.getName());
+                    }
+                });
+            }
+        });
+
+        registerRiver(null, null, null, ImmutableMap.of("script", "ctx._source.remove(fieldName)",
+                "params", ImmutableMap.of("fieldName", "title")));
+
+        checkMultiGetResponse(expectedDocuments);
+        checkMatchAllDocsSearchResponse(expectedDocuments);
+        checkRiverClosedOnCompletion();
     }
 
     private void checkRiverClosedOnCompletion() {
@@ -564,7 +623,7 @@ public class SolrRiverIntegrationTest {
             }
 
             Object actualValue = responseMap.get(field.getName());
-            Assert.assertNotNull(actualValue);
+            Assert.assertNotNull(actualValue, field.getName() + " field is null");
 
             Object expectedValue = field.getValue();
             if (expectedValue instanceof Date) {
@@ -592,6 +651,14 @@ public class SolrRiverIntegrationTest {
     private void registerRiver(Map<String, ? extends Object> solrConfig,
                                Map<String, ? extends Object> indexConfig,
                                Map<String, ? extends Object> mainConfig) throws Exception {
+
+        registerRiver(solrConfig, indexConfig, mainConfig, null);
+    }
+
+    private void registerRiver(Map<String, ? extends Object> solrConfig,
+                               Map<String, ? extends Object> indexConfig,
+                               Map<String, ? extends Object> mainConfig,
+                               Map<String, ? extends Object> transformConfig) throws Exception {
         XContentBuilder builder = XContentFactory.jsonBuilder().prettyPrint().startObject();
         builder.field("type", "solr");
 
@@ -617,6 +684,15 @@ public class SolrRiverIntegrationTest {
             }
             builder.endObject();
         }
+
+        if (transformConfig != null) {
+            builder.startObject("transform");
+            for (Map.Entry<String, ? extends Object> entry : transformConfig.entrySet()) {
+                builder.field(entry.getKey(), entry.getValue());
+            }
+            builder.endObject();
+        }
+
         builder.endObject();
 
         logger.debug("Registering river \n{}", builder.string());

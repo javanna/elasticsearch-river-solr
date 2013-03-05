@@ -45,8 +45,6 @@ public class DocumentGenerator {
         return generateDocuments(nextInt(DEFAULT_MAX_NUMBER_OF_DOCUMENTS));
     }
 
-
-
     public Map<String, Iterable<Field>> generateDocuments(int count) {
         Map<String, Iterable<Field>> documents = new HashMap<String, Iterable<Field>>();
         for (int i = 1; i <= count; i++) {
