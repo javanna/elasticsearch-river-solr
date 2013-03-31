@@ -160,6 +160,7 @@ public class SolrRiver extends AbstractRiverComponent implements River {
         this.scriptParams = scriptParams;
         this.scriptLang = scriptLang;
 
+
         this.bulkProcessor = BulkProcessor.builder(client, new BulkProcessor.Listener() {
             @Override
             public void beforeBulk(long executionId, BulkRequest request) {

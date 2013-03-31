@@ -1,4 +1,4 @@
-Solr River Plugin for ElasticSearch [![Build Status](https://buildhive.cloudbees.com/job/javanna/job/elasticsearch-river-solr/badge/icon)](https://buildhive.cloudbees.com/job/javanna/job/elasticsearch-river-solr/) [![Build Status](https://travis-ci.org/javanna/elasticsearch-river-solr.png)](https://travis-ci.org/javanna/elasticsearch-river-solr)
+Solr River Plugin for ElasticSearch [![Build Status](https://buildhive.cloudbees.com/job/javanna/job/elasticsearch-river-solr/badge/icon)](https://buildhive.cloudbees.com/job/javanna/job/elasticsearch-river-solr/) [![Build Status](https://travis-ci.org/javanna/elasticsearch-river-solr.png)](https://travis-ci.org/javanna/elasticsearch-river-solr) [![Build Status](https://drone.io/github.com/javanna/elasticsearch-river-solr/status.png)](https://drone.io/github.com/javanna/elasticsearch-river-solr/latest)
 ==================================
 
 The Solr River plugin allows to import data from [Apache Solr](http://lucene.apache.org/solr) to [elasticsearch](http://www.elasticsearch.org).
