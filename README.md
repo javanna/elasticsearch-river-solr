@@ -20,11 +20,11 @@ Versions
 	<tbody>
 	    <tr>
     	    <td><a href="http://bit.ly/12rmrSN">1.0.3</a></td>
-    		<td>0.20.0 -> 0.20.5</td>
+    		<td>0.20.0 -> 0.20.6</td>
         </tr>
 		<tr>
 			<td><a href="http://bit.ly/15cCMIB">1.0.2</a></td>
-			<td>0.20.0 -> 0.20.5</td>
+			<td>0.20.0 -> 0.20.6</td>
 		</tr>
 		<tr>
             <td><a href="http://bit.ly/Yo61UW">1.0.1</a></td>
