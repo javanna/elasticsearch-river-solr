@@ -19,7 +19,6 @@
 package org.elasticsearch.river.solr.support;
 
 import org.elasticsearch.action.get.MultiGetItemResponse;
-import org.elasticsearch.action.get.MultiGetRequest;
 import org.elasticsearch.action.get.MultiGetResponse;
 
 public class CheckMultiGetResponseCallback implements CheckResponseCallback<MultiGetResponse> {
@@ -27,7 +26,7 @@ public class CheckMultiGetResponseCallback implements CheckResponseCallback<Mult
     public boolean checkResponse(MultiGetResponse response) {
 
         for (MultiGetItemResponse itemResponse : response) {
-            if (itemResponse.failed() || !itemResponse.response().exists()) {
+            if (itemResponse.isFailed() || !itemResponse.getResponse().isExists()) {
                 return false;
             }
         }

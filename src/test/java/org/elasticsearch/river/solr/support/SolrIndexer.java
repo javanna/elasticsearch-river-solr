@@ -42,7 +42,7 @@ public class SolrIndexer {
 
     private SolrInputDocument buildSolrInputDocument(Iterable<Field> fields) {
         SolrInputDocument solrInputDocument = new SolrInputDocument();
-        for (Field<? extends Object> field : fields) {
+        for (Field<?> field : fields) {
             solrInputDocument.setField(field.getName(), field.getValue());
         }
         return solrInputDocument;

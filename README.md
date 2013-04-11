@@ -18,6 +18,10 @@ Versions
 		</tr>
 	</thead>
 	<tbody>
+	   <tr>
+        	<td>master</td>
+            <td>0.90.0</td>
+        </tr>
 	    <tr>
     	    <td><a href="http://bit.ly/12rmrSN">1.0.3</a></td>
     		<td>0.20.0 -> 0.20.6</td>

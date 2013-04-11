@@ -1,10 +1,10 @@
 <?xml version="1.0" encoding="UTF-8" ?>
 <config>
-    <luceneMatchVersion>LUCENE_36</luceneMatchVersion>
+    <luceneMatchVersion>LUCENE_42</luceneMatchVersion>
 
     <dataDir>${solr.data.dir:}</dataDir>
 
-    <directoryFactory name="DirectoryFactory" class="${solr.directoryFactory:solr.StandardDirectoryFactory}"/>
+    <directoryFactory name="DirectoryFactory" class="${solr.directoryFactory:solr.NRTCachingDirectoryFactory}"/>
 
     <updateHandler class="solr.DirectUpdateHandler2" />
 
@@ -12,6 +12,5 @@
 
     <requestHandler name="/select" class="solr.SearchHandler" />
 
-    <requestHandler name="/update" class="solr.XmlUpdateRequestHandler" />
-    <requestHandler name="/update/javabin" class="solr.BinaryUpdateRequestHandler" />
+    <requestHandler name="/update" class="solr.UpdateRequestHandler" />
 </config>

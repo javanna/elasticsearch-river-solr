@@ -32,11 +32,12 @@
     </distributionManagement>
 
     <properties>
-        <elasticsearch.version>0.20.6</elasticsearch.version>
+        <elasticsearch.version>0.90.0.RC2</elasticsearch.version>
         <!-- must match the lucene version used by elasticsearch
              solrj and solr-core (only for testing)  -->
-        <solr.version>3.6.1</solr.version>
+        <solr.version>4.2.1</solr.version>
         <httpclient.version>4.2.1</httpclient.version>
+        <jetty.version>8.1.8.v20121106</jetty.version>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     </properties>
 
@@ -113,11 +114,36 @@
             <artifactId>solr-core</artifactId>
             <version>${solr.version}</version>
             <scope>test</scope>
+            <exclusions>
+                <exclusion>
+                    <groupId>org.slf4j</groupId>
+                    <artifactId>slf4j-jdk14</artifactId>
+                </exclusion>
+            </exclusions>
+        </dependency>
+
+        <dependency>
+            <groupId>org.eclipse.jetty</groupId>
+            <artifactId>jetty-server</artifactId>
+            <version>${jetty.version}</version>
+            <scope>test</scope>
         </dependency>
         <dependency>
-            <groupId>org.mortbay.jetty</groupId>
-            <artifactId>jetty</artifactId>
-            <version>6.1.26</version>
+            <groupId>org.eclipse.jetty</groupId>
+            <artifactId>jetty-servlet</artifactId>
+            <version>${jetty.version}</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.eclipse.jetty</groupId>
+            <artifactId>jetty-util</artifactId>
+            <version>${jetty.version}</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.eclipse.jetty</groupId>
+            <artifactId>jetty-webapp</artifactId>
+            <version>${jetty.version}</version>
             <scope>test</scope>
         </dependency>
     </dependencies>

@@ -200,7 +200,7 @@ public class SolrRiver extends AbstractRiverComponent implements River {
     @Override
     public void start() {
 
-        if (!client.admin().indices().prepareExists(indexName).execute().actionGet().exists()) {
+        if (!client.admin().indices().prepareExists(indexName).execute().actionGet().isExists()) {
 
             CreateIndexRequestBuilder createIndexRequest = client.admin().indices()
                     .prepareCreate(indexName);

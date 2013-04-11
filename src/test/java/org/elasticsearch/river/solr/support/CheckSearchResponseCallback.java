@@ -23,6 +23,6 @@ import org.elasticsearch.action.search.SearchResponse;
 public class CheckSearchResponseCallback implements CheckResponseCallback<SearchResponse> {
     @Override
     public boolean checkResponse(SearchResponse response) {
-        return response.failedShards() == 0;
+        return response.getFailedShards() == 0;
     }
 }

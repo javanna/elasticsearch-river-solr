@@ -19,13 +19,12 @@
 
 package org.elasticsearch.river.solr.support;
 
-import org.elasticsearch.action.get.GetRequest;
 import org.elasticsearch.action.get.GetResponse;
 
 public class CheckGetResponseCallback implements CheckResponseCallback<GetResponse> {
 
     @Override
     public boolean checkResponse(GetResponse response) {
-        return response.exists();
+        return response.isExists();
     }
 }

@@ -23,6 +23,6 @@ import org.elasticsearch.action.admin.indices.refresh.RefreshResponse;
 public class CheckRefreshResponseCallback implements CheckResponseCallback<RefreshResponse> {
     @Override
     public boolean checkResponse(RefreshResponse response) {
-        return response.failedShards() == 0;
+        return response.getFailedShards() == 0;
     }
 }

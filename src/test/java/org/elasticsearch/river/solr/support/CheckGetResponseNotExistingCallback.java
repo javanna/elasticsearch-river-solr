@@ -25,6 +25,6 @@ public class CheckGetResponseNotExistingCallback implements CheckResponseCallbac
 
     @Override
     public boolean checkResponse(GetResponse response) {
-        return !response.exists();
+        return !response.isExists();
     }
 }

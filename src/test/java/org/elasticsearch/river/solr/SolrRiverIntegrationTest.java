@@ -90,9 +90,8 @@ public class SolrRiverIntegrationTest {
     public void beforeClass() throws Exception {
         //starts Solr server
         File solrHome = new File(Thread.currentThread().getContextClassLoader().getResource("solr/").toURI());
-        System.setProperty("solr.solr.home", solrHome.getAbsolutePath());
         System.setProperty("solr.data.dir", SOLR_DATA_DIR.getCanonicalPath());
-        jettySolrRunner = new JettySolrRunner("/solr-river", 8983);
+        jettySolrRunner = new JettySolrRunner(solrHome.getAbsolutePath(), "/solr-river", 8983);
         jettySolrRunner.start();
         solrIndexer = new SolrIndexer(new HttpSolrServer("http://localhost:8983/solr-river"));
 
@@ -527,13 +526,13 @@ public class SolrRiverIntegrationTest {
     private void checkRiverClosedOnCompletion() {
         checkGetResponseNotExisting("_river", "solr_river", "_meta");
         //we don't want to delete eventual other rivers
-        Assert.assertTrue(esClient.admin().indices().prepareExists("_river").execute().actionGet().exists());
+        Assert.assertTrue(esClient.admin().indices().prepareExists("_river").execute().actionGet().isExists());
     }
 
     private void checkRiverNotClosedOnCompletion() {
         checkGetResponse("_river", "solr_river", "_meta");
         //we don't want to delete eventual other rivers
-        Assert.assertTrue(esClient.admin().indices().prepareExists("_river").execute().actionGet().exists());
+        Assert.assertTrue(esClient.admin().indices().prepareExists("_river").execute().actionGet().isExists());
     }
 
     private void checkMultiGetResponse(Map<String, Iterable<Field>> expectedDocumentsMap) {
@@ -551,13 +550,13 @@ public class SolrRiverIntegrationTest {
     private void checkGetResponse(String index, String type, String id) {
         GetRequestBuilder getRequestBuilder = new GetRequestBuilder(esClient).setIndex(index).setType(type).setId(id);
         GetResponse getResponse = requestExecutor.tryExecute(getRequestBuilder, new CheckGetResponseCallback());
-        Assert.assertTrue(getResponse.exists());
+        Assert.assertTrue(getResponse.isExists());
     }
 
     private void checkGetResponseNotExisting(String index, String type, String id) {
         GetRequestBuilder getRequestBuilder = new GetRequestBuilder(esClient).setIndex(index).setType(type).setId(id);
         GetResponse getResponse = requestExecutor.tryExecute(getRequestBuilder, new CheckGetResponseNotExistingCallback());
-        Assert.assertFalse(getResponse.exists());
+        Assert.assertFalse(getResponse.isExists());
     }
 
     private void checkMultiGetResponse(Map<String, Iterable<Field>> expectedDocumentsMap,
@@ -572,12 +571,12 @@ public class SolrRiverIntegrationTest {
             MultiGetResponse multiGetResponse = requestExecutor.tryExecute(multiGetRequestBuilder, new CheckMultiGetResponseCallback());
 
             Assert.assertNotNull(multiGetResponse);
-            Assert.assertEquals(multiGetResponse.responses().length, keySet.size());
+            Assert.assertEquals(multiGetResponse.getResponses().length, keySet.size());
 
             for (MultiGetItemResponse multiGetItemResponse : multiGetResponse) {
-                Assert.assertFalse(multiGetItemResponse.failed());
-                GetResponse getResponse = multiGetItemResponse.response();
-                Iterable<Field> expectedDocument = expectedDocumentsMap.get(getResponse.id());
+                Assert.assertFalse(multiGetItemResponse.isFailed());
+                GetResponse getResponse = multiGetItemResponse.getResponse();
+                Iterable<Field> expectedDocument = expectedDocumentsMap.get(getResponse.getId());
                 assertDocumentsEquals(getResponse, expectedDocument, uniqueKeyField);
             }
         }
@@ -591,13 +590,13 @@ public class SolrRiverIntegrationTest {
         refreshIndex(index);
         SearchRequestBuilder searchRequestBuilder = esClient.prepareSearch(index).setTypes(type);
         SearchResponse searchResponse = search(searchRequestBuilder);
-        Assert.assertEquals(searchResponse.hits().totalHits(), expectedDocumentsMap.size());
+        Assert.assertEquals(searchResponse.getHits().totalHits(), expectedDocumentsMap.size());
     }
 
     private void checkSearchResponse(Map<String, Iterable<Field>> expectedDocumentsMap, SearchRequestBuilder searchRequestBuilder) {
         refreshIndex("solr");
         SearchResponse searchResponse = search(searchRequestBuilder);
-        Assert.assertEquals(searchResponse.hits().totalHits(), expectedDocumentsMap.size());
+        Assert.assertEquals(searchResponse.getHits().totalHits(), expectedDocumentsMap.size());
     }
 
     private void refreshIndex(String index) {
@@ -611,8 +610,8 @@ public class SolrRiverIntegrationTest {
     }
 
     private static void assertDocumentsEquals(GetResponse getResponse, Iterable<Field> expectedDocument, String uniqueKeyFieldName) {
-        Assert.assertTrue(getResponse.exists());
-        Map<String, Object> responseMap = getResponse.sourceAsMap();
+        Assert.assertTrue(getResponse.isExists());
+        Map<String, Object> responseMap = getResponse.getSourceAsMap();
         Assert.assertNotNull(responseMap);
 
         int count = 0;
@@ -643,27 +642,27 @@ public class SolrRiverIntegrationTest {
         registerRiver(null, null, null);
     }
 
-    private void registerRiver(Map<String, ? extends Object> solrConfig,
-                               Map<String, ? extends Object> indexConfig) throws Exception {
+    private void registerRiver(Map<String, ?> solrConfig,
+                               Map<String, ?> indexConfig) throws Exception {
         registerRiver(solrConfig, indexConfig, null);
     }
 
-    private void registerRiver(Map<String, ? extends Object> solrConfig,
-                               Map<String, ? extends Object> indexConfig,
-                               Map<String, ? extends Object> mainConfig) throws Exception {
+    private void registerRiver(Map<String, ?> solrConfig,
+                               Map<String, ?> indexConfig,
+                               Map<String, ?> mainConfig) throws Exception {
 
         registerRiver(solrConfig, indexConfig, mainConfig, null);
     }
 
-    private void registerRiver(Map<String, ? extends Object> solrConfig,
-                               Map<String, ? extends Object> indexConfig,
-                               Map<String, ? extends Object> mainConfig,
-                               Map<String, ? extends Object> transformConfig) throws Exception {
+    private void registerRiver(Map<String, ?> solrConfig,
+                               Map<String, ?> indexConfig,
+                               Map<String, ?> mainConfig,
+                               Map<String, ?> transformConfig) throws Exception {
         XContentBuilder builder = XContentFactory.jsonBuilder().prettyPrint().startObject();
         builder.field("type", "solr");
 
         if (mainConfig != null) {
-            for (Map.Entry<String, ? extends Object> entry : mainConfig.entrySet()) {
+            for (Map.Entry<String, ?> entry : mainConfig.entrySet()) {
                 builder.field(entry.getKey(), entry.getValue());
             }
         }
@@ -671,7 +670,7 @@ public class SolrRiverIntegrationTest {
         builder.startObject("solr");
         builder.field("url", "http://localhost:8983/solr-river/");
         if (solrConfig != null) {
-            for (Map.Entry<String, ? extends Object> entry : solrConfig.entrySet()) {
+            for (Map.Entry<String, ?> entry : solrConfig.entrySet()) {
                 builder.field(entry.getKey(), entry.getValue());
             }
         }
@@ -679,7 +678,7 @@ public class SolrRiverIntegrationTest {
 
         if (indexConfig != null) {
             builder.startObject("index");
-            for (Map.Entry<String, ? extends Object> entry : indexConfig.entrySet()) {
+            for (Map.Entry<String, ?> entry : indexConfig.entrySet()) {
                 builder.field(entry.getKey(), entry.getValue());
             }
             builder.endObject();
@@ -687,7 +686,7 @@ public class SolrRiverIntegrationTest {
 
         if (transformConfig != null) {
             builder.startObject("transform");
-            for (Map.Entry<String, ? extends Object> entry : transformConfig.entrySet()) {
+            for (Map.Entry<String, ?> entry : transformConfig.entrySet()) {
                 builder.field(entry.getKey(), entry.getValue());
             }
             builder.endObject();

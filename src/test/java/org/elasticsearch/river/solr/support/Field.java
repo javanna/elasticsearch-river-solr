@@ -18,7 +18,7 @@
  */
 package org.elasticsearch.river.solr.support;
 
-public class Field<Value extends Object> {
+public class Field<Value> {
 
     private final String name;
     private final Value value;
