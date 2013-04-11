@@ -71,7 +71,7 @@ public class SolrRiver extends AbstractRiverComponent implements River {
     private final String[] filterQueries;
     private final String[] fields;
     private final String responseWriterType;
-    private final String queryType;
+    private final String requestHandler;
     private final String uniqueKey;
     private final int rows;
 
@@ -125,7 +125,7 @@ public class SolrRiver extends AbstractRiverComponent implements River {
         this.filterQueries = fq;
         this.fields = fl;
         this.responseWriterType = wt;
-        this.queryType = qt;
+        this.requestHandler = qt;
 
         String index = riverName.type();
         String type = "import";
@@ -320,8 +320,8 @@ public class SolrRiver extends AbstractRiverComponent implements River {
         if (fields != null) {
             solrQuery.setFields(fields);
         }
-        if (queryType != null) {
-            solrQuery.setQueryType(queryType);
+        if (requestHandler != null) {
+            solrQuery.setRequestHandler(requestHandler);
         }
         solrQuery.setRows(rows);
         return solrQuery;
