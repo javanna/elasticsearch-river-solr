@@ -144,7 +144,7 @@ public class SolrRiver extends AbstractRiverComponent implements River {
             maxConcurrentBulk = XContentMapValues.nodeIntegerValue(indexSettings.get("max_concurrent_bulk"), maxConcurrentBulk);
             settings = XContentMapValues.nodeStringValue(indexSettings.get("settings"), settings);
             mapping = XContentMapValues.nodeStringValue(indexSettings.get("mapping"), mapping);
-            numWorkers = XContentMapValues.nodeIntegerValue(indexSettings.get("num_workers"), bulkSize);
+            numWorkers = XContentMapValues.nodeIntegerValue(indexSettings.get("num_workers"), numWorkers);
         }
         this.settings = settings;
         this.mapping = mapping;
