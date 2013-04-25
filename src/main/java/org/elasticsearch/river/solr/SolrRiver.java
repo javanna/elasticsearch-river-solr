@@ -291,9 +291,8 @@ public class SolrRiver extends AbstractRiverComponent implements River {
                 QueryResponse queryResponse = solrServer.query(solrQuery);
                 long numFound = queryResponse.getResults().getNumFound();
                 if (numFound < startParam) {
-                    if (logger.isWarnEnabled()) {
-                        logger.warn(getCurrentThreadPrefix() + " The solr query {} returned 0 documents", solrQuery);
-                    }
+                    logger.info(getCurrentThreadPrefix() + " Finishing work as no more results returned from solr - numFound: " + numFound + ", " +
+                            "start: " + startParam);
                     // no more docs to work with
                     return;
                 }
