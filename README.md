@@ -23,7 +23,7 @@ Versions
             <td>0.90.0</td>
         </tr>
         <tr>
-            <td><a href="http://bit.ly/10ioSk0">1.0.3</a></td>
+            <td><a href="http://bit.ly/10ioSk0">1.0.4</a></td>
             <td>0.90.0 -> master</td>
         </tr>
 	    <tr>
