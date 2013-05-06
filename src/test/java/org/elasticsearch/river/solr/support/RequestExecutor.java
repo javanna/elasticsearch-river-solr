@@ -45,7 +45,7 @@ public class RequestExecutor {
         long start = System.currentTimeMillis();
         while(true) {
             try {
-                logger.debug("Sending request [retry {}]", retries);
+                logger.debug("Sending {} request [retry {}]", actionRequestBuilder.request().getClass().getSimpleName(), retries);
                 Response response = actionRequestBuilder.execute().actionGet();
                 long waitTime = System.currentTimeMillis() - start;
                 retries++;
@@ -55,7 +55,7 @@ public class RequestExecutor {
                     return response;
                 }
             } catch(Exception e) {
-                //logger.debug("Error while checking the response [retry {}]", retries, e);
+                logger.debug("Error while checking the response [retry {}]", retries, e);
             }
 
             try {

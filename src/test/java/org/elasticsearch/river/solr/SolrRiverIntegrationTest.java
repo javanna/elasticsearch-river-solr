@@ -18,6 +18,10 @@
  */
 package org.elasticsearch.river.solr;
 
+import java.io.File;
+import java.io.IOException;
+import java.util.*;
+
 import org.apache.commons.io.FileUtils;
 import org.apache.solr.client.solrj.SolrServerException;
 import org.apache.solr.client.solrj.embedded.JettySolrRunner;
@@ -52,10 +56,6 @@ import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
-
-import java.io.File;
-import java.io.IOException;
-import java.util.*;
 
 public class SolrRiverIntegrationTest {
 
@@ -231,10 +231,10 @@ public class SolrRiverIntegrationTest {
                 boolean categoryMatch = false;
                 for (Field field : entry.getValue()) {
                     if ("keywords".equals(field.getName())) {
-                        keywordMatch = ((List)field.getValue()).contains(keyword);
+                        keywordMatch = ((List) field.getValue()).contains(keyword);
                     }
                     if ("category".equals(field.getName())) {
-                        categoryMatch= category.equals(field.getValue());
+                        categoryMatch = category.equals(field.getValue());
                     }
                 }
                 return categoryMatch && keywordMatch;
@@ -294,35 +294,35 @@ public class SolrRiverIntegrationTest {
 
         Map<String, Iterable<Field>> expectedDocumentsFiltered = Maps.filterEntries(documentsMap,
                 new Predicate<Map.Entry<String, Iterable<Field>>>() {
-            @Override
-            public boolean apply(Map.Entry<String, Iterable<Field>> entry) {
-                boolean keywordMatch = false;
-                boolean categoryMatch = false;
-                for (Field field : entry.getValue()) {
-                    if ("keywords".equals(field.getName())) {
-                        keywordMatch = ((List)field.getValue()).contains(keyword);
+                    @Override
+                    public boolean apply(Map.Entry<String, Iterable<Field>> entry) {
+                        boolean keywordMatch = false;
+                        boolean categoryMatch = false;
+                        for (Field field : entry.getValue()) {
+                            if ("keywords".equals(field.getName())) {
+                                keywordMatch = ((List) field.getValue()).contains(keyword);
+                            }
+                            if ("category".equals(field.getName())) {
+                                categoryMatch = category.equals(field.getValue());
+                            }
+                        }
+                        return categoryMatch && keywordMatch;
                     }
-                    if ("category".equals(field.getName())) {
-                        categoryMatch= category.equals(field.getValue());
-                    }
-                }
-                return categoryMatch && keywordMatch;
-            }
-        });
+                });
 
         final List<String> flAsList = Arrays.asList(fl);
         Map<String, Iterable<Field>>expectedDocuments = Maps.transformValues(expectedDocumentsFiltered,
                 new Function<Iterable<Field>, Iterable<Field>>() {
-            @Override
-            public Iterable<Field> apply(Iterable<Field> fields) {
-                return Iterables.filter(fields, new Predicate<Field>() {
                     @Override
-                    public boolean apply(Field field) {
-                        return flAsList.contains(field.getName());
+                    public Iterable<Field> apply(Iterable<Field> fields) {
+                        return Iterables.filter(fields, new Predicate<Field>() {
+                            @Override
+                            public boolean apply(Field field) {
+                                return flAsList.contains(field.getName());
+                            }
+                        });
                     }
                 });
-            }
-        });
 
         checkMultiGetResponse(expectedDocuments);
         checkMatchAllDocsSearchResponse(expectedDocuments);
@@ -697,5 +697,7 @@ public class SolrRiverIntegrationTest {
         logger.debug("Registering river \n{}", builder.string());
 
         esClient.index(Requests.indexRequest("_river").type("solr_river").id("_meta").source(builder)).actionGet();
+
+
     }
 }
