@@ -6,7 +6,7 @@
 
     <groupId>org.elasticsearch</groupId>
     <artifactId>elasticsearch-river-solr</artifactId>
-    <version>1.0.4-SNAPSHOT</version>
+    <version>1.0.4</version>
     <packaging>jar</packaging>
     <description>Solr River for ElasticSearch</description>
     <inceptionYear>2012</inceptionYear>
@@ -32,7 +32,7 @@
     </distributionManagement>
 
     <properties>
-        <elasticsearch.version>0.90.0.RC2</elasticsearch.version>
+        <elasticsearch.version>0.90.0</elasticsearch.version>
         <!-- must match the lucene version used by elasticsearch
              solrj and solr-core (only for testing)  -->
         <solr.version>4.2.1</solr.version>

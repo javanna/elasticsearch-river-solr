@@ -1,3 +1,8 @@
+Version 1.0.4
+Date: 06/05/2013
+Changes:
+* Updated to elasticsearch 0.90.0
+
 Version: 1.0.3
 Date: 05/03/2013
 Changes:
