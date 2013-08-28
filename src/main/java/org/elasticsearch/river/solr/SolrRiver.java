@@ -55,6 +55,7 @@ import java.nio.charset.Charset;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 
 /**
@@ -84,6 +85,7 @@ public class SolrRiver extends AbstractRiverComponent implements River {
     private final String script;
     private final Map<String, Object> scriptParams;
     private final String scriptLang;
+    private final int numWorkers;
 
     private volatile BulkProcessor bulkProcessor;
     private AtomicInteger start = new AtomicInteger(0);
@@ -133,6 +135,7 @@ public class SolrRiver extends AbstractRiverComponent implements River {
         int bulkSize = 100;
         String mapping = null;
         String settings = null;
+        int numWorkers = 1;
         if (riverSettings.settings().containsKey("index")) {
             Map<String, Object> indexSettings = (Map<String, Object>) riverSettings.settings().get("index");
             index = XContentMapValues.nodeStringValue(indexSettings.get("index"), index);
@@ -141,11 +144,17 @@ public class SolrRiver extends AbstractRiverComponent implements River {
             maxConcurrentBulk = XContentMapValues.nodeIntegerValue(indexSettings.get("max_concurrent_bulk"), maxConcurrentBulk);
             settings = XContentMapValues.nodeStringValue(indexSettings.get("settings"), settings);
             mapping = XContentMapValues.nodeStringValue(indexSettings.get("mapping"), mapping);
+            numWorkers = XContentMapValues.nodeIntegerValue(indexSettings.get("num_workers"), numWorkers);
         }
         this.settings = settings;
         this.mapping = mapping;
         this.indexName = index;
         this.typeName = type;
+        this.numWorkers = numWorkers;
+
+        if (numWorkers <= 0) {
+            throw new IllegalArgumentException("num_workers should be minimum 1");
+        }
 
         String script = null;
         Map<String, Object> scriptParams = Maps.newHashMap();
@@ -202,8 +211,7 @@ public class SolrRiver extends AbstractRiverComponent implements River {
 
         if (!client.admin().indices().prepareExists(indexName).execute().actionGet().isExists()) {
 
-            CreateIndexRequestBuilder createIndexRequest = client.admin().indices()
-                    .prepareCreate(indexName);
+            CreateIndexRequestBuilder createIndexRequest = client.admin().indices().prepareCreate(indexName);
 
             if (settings != null) {
                 createIndexRequest.setSettings(settings);
@@ -215,20 +223,78 @@ public class SolrRiver extends AbstractRiverComponent implements River {
             createIndexRequest.execute().actionGet();
         }
 
-        SolrServer solrServer = createSolrServer();
-        SolrQuery solrQuery = createSolrQuery();
+        final SolrServer solrServer = createSolrServer();
 
-        Long numFound = null;
-        int startParam;
-        while ((startParam = start.getAndAdd(rows)) == 0 || startParam < numFound) {
+        Thread[] threads = new Thread[numWorkers];
+        final long startTime = System.currentTimeMillis();
+        final long[] workerTimes = new long[numWorkers];
+
+        logger.info("Starting " + numWorkers + " workers...");
+
+        final AtomicBoolean solrServerError = new AtomicBoolean(false);
+        for (int i = 0; i < numWorkers; i++) {
+            final int index = i;
+            threads[i] = new Thread(new Runnable() {
+                @Override
+                public void run() {
+                    final long workerStart = System.currentTimeMillis();
+
+                    SolrQuery solrQuery = createSolrQuery();
+                    doWork(solrServer, solrQuery, solrServerError);
+
+                    workerTimes[index] = System.currentTimeMillis() - workerStart;
+                }
+            }, "Worker-" + i);
+            threads[i].setDaemon(true);
+            threads[i].start();
+        }
+
+        logger.info("Master thread waiting for all workers to complete (" + numWorkers + " workers) ...");
+        for (Thread thread : threads) {
+            try {
+                thread.join();
+            } catch (InterruptedException e) {
+                logger.warn("Main thread interrupted, not waiting for worker threads");
+                break;
+            }
+        }
+
+        bulkProcessor.close();
+
+        long endTime = System.currentTimeMillis();
+        logger.info("Time taken statistics");
+        for (int i = 0; i < workerTimes.length; i++) {
+            logger.info("Worker-" + i + ": " + workerTimes[i] + " millis");
+        }
+        logger.info("Total time: " + (endTime - startTime) + " millis");
+
+
+        logger.info("Data import from solr to elasticsearch completed");
+
+        if (closeOnCompletion) {
+            logger.info("Deleting river");
+            client.admin().indices().prepareDeleteMapping("_river").setType(riverName.name()).execute();
+        }
+    }
+
+    private void doWork(SolrServer solrServer, SolrQuery solrQuery, AtomicBoolean solrServerError) {
+        while (true) {
+            if (solrServerError.get()) {
+                // break out if solr server error
+                break;
+            }
+            int startParam = start.getAndAdd(rows);
             solrQuery.setStart(startParam);
 
             try {
-                logger.info("Sending query to Solr: {}", solrQuery);
+                logger.info(getCurrentThreadPrefix() + " Sending query to Solr: {}", solrQuery);
                 QueryResponse queryResponse = solrServer.query(solrQuery);
-                numFound = queryResponse.getResults().getNumFound();
-                if (logger.isWarnEnabled() && numFound == 0) {
-                    logger.warn("The solr query {} returned 0 documents", solrQuery);
+                long numFound = queryResponse.getResults().getNumFound();
+                if (numFound < startParam) {
+                    logger.info(getCurrentThreadPrefix() + " Finishing work as no more results returned from solr - numFound: " + numFound + ", " +
+                            "start: " + startParam);
+                    // no more docs to work with
+                    return;
                 }
 
                 SolrDocumentList solrDocumentList = queryResponse.getResults();
@@ -255,34 +321,27 @@ public class SolrRiver extends AbstractRiverComponent implements River {
                             bulkProcessor.add(indexRequest);
                         } else {
                             if (idObject == null) {
-                                logger.error("The uniqueKey value is null");
+                                logger.error(getCurrentThreadPrefix() + " The uniqueKey value is null");
                             } else {
-                                logger.error("The uniqueKey value is not a string but a {}", idObject.getClass().getName());
+                                logger.error(getCurrentThreadPrefix() + " The uniqueKey value is not a string but a {}",
+                                        idObject.getClass().getName());
                             }
                         }
                     } catch (IOException e) {
-                        logger.warn("Error while importing documents from solr to elasticsearch", e);
+                        logger.warn(getCurrentThreadPrefix() + " Error while importing documents from solr to elasticsearch", e);
                     }
                 }
             } catch (SolrServerException e) {
-                logger.error("Error while executing the solr query [" + solrQuery.getQuery() + "]", e);
+                logger.error(getCurrentThreadPrefix() + " Error while executing the solr query [" + solrQuery.getQuery() + "]", e);
                 //if a query fails the next ones are most likely going to fail too
-                return;
+                solrServerError.set(true);
             }
-        }
-
-        bulkProcessor.close();
-
-        logger.info("Data import from solr to elasticsearch completed");
-
-        if (closeOnCompletion) {
-            logger.info("Deleting river");
-            client.admin().indices().prepareDeleteMapping("_river").setType(riverName.name()).execute();
         }
     }
 
     protected Tuple<XContentType, Map<String, Object>> transformDocument(String jsonDocument) {
-        Tuple<XContentType, Map<String, Object>> sourceAndContent = XContentHelper.convertToMap(jsonDocument.getBytes(Charset.forName("utf-8")), true);
+        Tuple<XContentType, Map<String, Object>> sourceAndContent = XContentHelper
+                .convertToMap(jsonDocument.getBytes(Charset.forName("utf-8")), true);
 
         Map<String, Object> ctx = new HashMap<String, Object>(2);
         ctx.put("_source", sourceAndContent.v2());
@@ -330,5 +389,9 @@ public class SolrRiver extends AbstractRiverComponent implements River {
     @Override
     public void close() {
 
+    }
+
+    private static String getCurrentThreadPrefix() {
+        return "[" + Thread.currentThread().getName() + "]";
     }
 }
