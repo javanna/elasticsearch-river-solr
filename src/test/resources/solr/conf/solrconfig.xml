@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8" ?>
 <config>
-    <luceneMatchVersion>LUCENE_42</luceneMatchVersion>
+    <luceneMatchVersion>LUCENE_45</luceneMatchVersion>
 
     <dataDir>${solr.data.dir:}</dataDir>
 
@@ -13,4 +13,6 @@
     <requestHandler name="/select" class="solr.SearchHandler" />
 
     <requestHandler name="/update" class="solr.UpdateRequestHandler" />
+
+    <queryResponseWriter name="json" class="solr.JSONResponseWriter" />
 </config>

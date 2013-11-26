@@ -24,7 +24,7 @@ import static org.elasticsearch.river.solr.support.Random.*;
 
 public class DocumentGenerator {
 
-    private static final int DEFAULT_MAX_NUMBER_OF_DOCUMENTS = 2500;
+    private static final int DEFAULT_MAX_NUMBER_OF_DOCUMENTS = 500;
 
     private final List<String> availableKeywords;
     private final List<String> availableCategories;
@@ -41,12 +41,12 @@ public class DocumentGenerator {
         }
     }
 
-    public Map<String, Iterable<Field>> generateRandomDocuments() {
+    public Map<String, Map<String, Object>> generateRandomDocuments() {
         return generateDocuments(nextInt(DEFAULT_MAX_NUMBER_OF_DOCUMENTS));
     }
 
-    public Map<String, Iterable<Field>> generateDocuments(int count) {
-        Map<String, Iterable<Field>> documents = new HashMap<String, Iterable<Field>>();
+    private Map<String, Map<String, Object>> generateDocuments(int count) {
+        Map<String, Map<String, Object>> documents = new HashMap<String, Map<String, Object>>();
         for (int i = 1; i <= count; i++) {
             String uniqueKeyFieldValue = "id_" + i;
             documents.put(uniqueKeyFieldValue, generateDocument(uniqueKeyFieldValue));
@@ -54,16 +54,16 @@ public class DocumentGenerator {
         return documents;
     }
 
-    public List<Field> generateDocument(String uniqueKeyFieldValue) {
-        List<Field> fields = new ArrayList<Field>();
-        fields.add(new Field<String>("id", uniqueKeyFieldValue));
-        fields.add(new Field<String>("id_test", uniqueKeyFieldValue));
+    public Map<String, Object> generateDocument(String uniqueKeyFieldValue) {
+        Map<String, Object> fields = new HashMap<String, Object>();
+        fields.put("id", uniqueKeyFieldValue);
+        fields.put("id_test", uniqueKeyFieldValue);
 
         if (nextBoolean()) {
-            fields.add(new Field<String>("title", nextSentence(5)));
+            fields.put("title", nextSentence(5));
         }
         if (nextBoolean()) {
-            fields.add(new Field<String>("description", nextSentence(15)));
+            fields.put("description", nextSentence(15));
         }
         if (nextBoolean()) {
             int numKeywords = nextInt(5);
@@ -72,15 +72,15 @@ public class DocumentGenerator {
                 keywords.add(availableKeywords.get(nextInt(availableKeywords.size() - 1)));
             }
             if (!keywords.isEmpty()) {
-                fields.add(new Field<List<String>>("keywords", keywords));
+                fields.put("keywords", keywords);
             }
         }
 
         if (nextBoolean()) {
-            fields.add(new Field<String>("category", availableCategories.get(nextInt(availableCategories.size() - 1))));
+            fields.put("category", availableCategories.get(nextInt(availableCategories.size() - 1)));
         }
 
-        fields.add(new Field<Date>("publish_date", nextDate()));
+        fields.put("publish_date", nextDate());
 
         return fields;
     }

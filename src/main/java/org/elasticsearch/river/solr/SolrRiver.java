@@ -18,16 +18,15 @@
  */
 package org.elasticsearch.river.solr;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
-import org.apache.solr.client.solrj.SolrQuery;
-import org.apache.solr.client.solrj.SolrServer;
-import org.apache.solr.client.solrj.SolrServerException;
-import org.apache.solr.client.solrj.impl.HttpSolrServer;
-import org.apache.solr.client.solrj.impl.XMLResponseParser;
-import org.apache.solr.client.solrj.response.QueryResponse;
-import org.apache.solr.common.SolrDocument;
-import org.apache.solr.common.SolrDocumentList;
+import com.fasterxml.jackson.databind.node.ObjectNode;
+import org.apache.http.client.methods.CloseableHttpResponse;
+import org.apache.http.client.methods.HttpGet;
+import org.apache.http.impl.client.CloseableHttpClient;
+import org.apache.http.impl.client.HttpClients;
+import org.apache.http.util.EntityUtils;
 import org.elasticsearch.ElasticSearchIllegalArgumentException;
 import org.elasticsearch.action.admin.indices.create.CreateIndexRequestBuilder;
 import org.elasticsearch.action.bulk.BulkProcessor;
@@ -36,6 +35,7 @@ import org.elasticsearch.action.bulk.BulkResponse;
 import org.elasticsearch.action.index.IndexRequest;
 import org.elasticsearch.client.Client;
 import org.elasticsearch.client.Requests;
+import org.elasticsearch.common.Strings;
 import org.elasticsearch.common.collect.Maps;
 import org.elasticsearch.common.collect.Tuple;
 import org.elasticsearch.common.inject.Inject;
@@ -50,9 +50,11 @@ import org.elasticsearch.script.ExecutableScript;
 import org.elasticsearch.script.ScriptService;
 
 import java.io.IOException;
-import java.io.StringWriter;
+import java.io.UnsupportedEncodingException;
+import java.net.URLEncoder;
 import java.nio.charset.Charset;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -70,7 +72,6 @@ public class SolrRiver extends AbstractRiverComponent implements River {
     private final String query;
     private final String[] filterQueries;
     private final String[] fields;
-    private final String responseWriterType;
     private final String requestHandler;
     private final String uniqueKey;
     private final int rows;
@@ -88,10 +89,13 @@ public class SolrRiver extends AbstractRiverComponent implements River {
     private volatile BulkProcessor bulkProcessor;
     private AtomicInteger start = new AtomicInteger(0);
 
+    private final ObjectMapper objectMapper;
+    private final CloseableHttpClient httpClient;
+
     static final String DEFAULT_UNIQUE_KEY = "id";
 
-
     @Inject
+    @SuppressWarnings("unchecked")
     protected SolrRiver(RiverName riverName, RiverSettings riverSettings, Client client, ScriptService scriptService) {
         super(riverName, riverSettings);
         this.client = client;
@@ -103,8 +107,7 @@ public class SolrRiver extends AbstractRiverComponent implements River {
         String q = "*:*";
         String uniqueKey = DEFAULT_UNIQUE_KEY;
         int rows = 10;
-        String wt, qt;
-        wt = qt = null;
+        String qt = "select";
         String[] fq, fl;
         fq = fl = null;
         if (riverSettings.settings().containsKey("solr")) {
@@ -114,8 +117,7 @@ public class SolrRiver extends AbstractRiverComponent implements River {
             rows = XContentMapValues.nodeIntegerValue(solrSettings.get("rows"), rows);
             fq = readArrayOrString(solrSettings.get("fq"));
             fl = readArrayOrString(solrSettings.get("fl"));
-            wt = XContentMapValues.nodeStringValue(solrSettings.get("wt"), null);
-            qt = XContentMapValues.nodeStringValue(solrSettings.get("qt"), null);
+            qt = XContentMapValues.nodeStringValue(solrSettings.get("qt"), qt);
             uniqueKey = XContentMapValues.nodeStringValue(solrSettings.get("uniqueKey"), uniqueKey);
         }
         this.solrUrl = url;
@@ -124,7 +126,6 @@ public class SolrRiver extends AbstractRiverComponent implements River {
         this.uniqueKey = uniqueKey;
         this.filterQueries = fq;
         this.fields = fl;
-        this.responseWriterType = wt;
         this.requestHandler = qt;
 
         String index = riverName.type();
@@ -177,6 +178,11 @@ public class SolrRiver extends AbstractRiverComponent implements River {
                 logger.warn("Error executing bulk", failure);
             }
         }).setBulkActions(bulkSize).setConcurrentRequests(maxConcurrentBulk).build();
+
+        this.objectMapper = new ObjectMapper();
+        this.objectMapper.configure(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS, false);
+
+        this.httpClient = HttpClients.createDefault();
     }
 
     private String[] readArrayOrString(Object node) {
@@ -215,63 +221,88 @@ public class SolrRiver extends AbstractRiverComponent implements River {
             createIndexRequest.execute().actionGet();
         }
 
-        SolrServer solrServer = createSolrServer();
-        SolrQuery solrQuery = createSolrQuery();
+        StringBuilder baseSolrQuery = createSolrQuery();
 
         Long numFound = null;
         int startParam;
         while ((startParam = start.getAndAdd(rows)) == 0 || startParam < numFound) {
-            solrQuery.setStart(startParam);
-
+            String solrQuery = baseSolrQuery.toString() + "&start=" + startParam;
+            CloseableHttpResponse httpResponse = null;
             try {
                 logger.info("Sending query to Solr: {}", solrQuery);
-                QueryResponse queryResponse = solrServer.query(solrQuery);
-                numFound = queryResponse.getResults().getNumFound();
+                httpResponse = httpClient.execute(new HttpGet(solrQuery));
+
+                if (httpResponse.getStatusLine().getStatusCode() != 200) {
+                    logger.error("Solr returned non ok status code: {}", httpResponse.getStatusLine().getReasonPhrase());
+                    EntityUtils.consume(httpResponse.getEntity());
+                    continue;
+                }
+
+                JsonNode jsonNode = objectMapper.readTree(EntityUtils.toString(httpResponse.getEntity()));
+                JsonNode response = jsonNode.get("response");
+                JsonNode numFoundNode = response.get("numFound");
+                numFound = numFoundNode.asLong();
                 if (logger.isWarnEnabled() && numFound == 0) {
                     logger.warn("The solr query {} returned 0 documents", solrQuery);
                 }
 
-                SolrDocumentList solrDocumentList = queryResponse.getResults();
-                ObjectMapper mapper = new ObjectMapper();
-                mapper.configure(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS, false);
+                Iterator<JsonNode> docsIterator = response.get("docs").iterator();
 
-                for (SolrDocument solrDocument : solrDocumentList) {
+                while (docsIterator.hasNext()) {
+                    JsonNode docNode = docsIterator.next();
+
                     try {
-                        Object idObject = solrDocument.get(uniqueKey);
-                        if (idObject instanceof String) {
-                            String id = (String) idObject;
-                            solrDocument.remove(uniqueKey);
-                            StringWriter jsonWriter = new StringWriter();
-                            mapper.writeValue(jsonWriter, solrDocument);
+                        JsonNode uniqueKeyNode = docNode.get(uniqueKey);
+
+                        if (uniqueKeyNode == null) {
+                            logger.error("The uniqueKey value is null");
+                        } else {
+                            String id = uniqueKeyNode.asText();
+                            ((ObjectNode) docNode).remove(uniqueKey);
 
                             IndexRequest indexRequest = Requests.indexRequest(indexName).type(typeName).id(id);
+                            String source = objectMapper.writeValueAsString(docNode);
                             if (this.script == null) {
-                                indexRequest.source(jsonWriter.toString());
+                                indexRequest.source(source);
                             } else {
-                                Tuple<XContentType, Map<String, Object>> newSourceAndContent = transformDocument(jsonWriter.toString());
+                                Tuple<XContentType, Map<String, Object>> newSourceAndContent = transformDocument(source);
                                 indexRequest.source(newSourceAndContent.v2(), newSourceAndContent.v1());
                             }
 
                             bulkProcessor.add(indexRequest);
-                        } else {
-                            if (idObject == null) {
-                                logger.error("The uniqueKey value is null");
-                            } else {
-                                logger.error("The uniqueKey value is not a string but a {}", idObject.getClass().getName());
-                            }
+
                         }
                     } catch (IOException e) {
                         logger.warn("Error while importing documents from solr to elasticsearch", e);
                     }
                 }
-            } catch (SolrServerException e) {
-                logger.error("Error while executing the solr query [" + solrQuery.getQuery() + "]", e);
+            } catch (IOException e) {
+                logger.error("Error while executing the solr query [" + solrQuery + "]", e);
+                bulkProcessor.close();
+                try {
+                    httpClient.close();
+                } catch(IOException ioe) {
+                    logger.warn(e.getMessage(), ioe);
+                }
                 //if a query fails the next ones are most likely going to fail too
                 return;
+            } finally {
+                if (httpResponse != null) {
+                    try {
+                        httpResponse.close();
+                    } catch (IOException e) {
+                        logger.error(e.getMessage(), e);
+                    }
+                }
             }
         }
 
         bulkProcessor.close();
+        try {
+            httpClient.close();
+        } catch (IOException e) {
+            logger.warn(e.getMessage(), e);
+        }
 
         logger.info("Data import from solr to elasticsearch completed");
 
@@ -281,6 +312,7 @@ public class SolrRiver extends AbstractRiverComponent implements River {
         }
     }
 
+    @SuppressWarnings("unchecked")
     protected Tuple<XContentType, Map<String, Object>> transformDocument(String jsonDocument) {
         Tuple<XContentType, Map<String, Object>> sourceAndContent = XContentHelper.convertToMap(jsonDocument.getBytes(Charset.forName("utf-8")), true);
 
@@ -300,31 +332,42 @@ public class SolrRiver extends AbstractRiverComponent implements River {
         return new Tuple<XContentType, Map<String, Object>>(sourceAndContent.v1(), updatedSourceAsMap);
     }
 
-    protected SolrServer createSolrServer() {
-        SolrServer solrServer = null;
-        //Solrj doesn't support json, only javabin or xml
-        //We allow to use xml to deal with javabin cross-versions compatibility issues
-        if ("xml".equals(responseWriterType)) {
-            solrServer = new HttpSolrServer(solrUrl, null, new XMLResponseParser());
-        } else {
-            solrServer = new HttpSolrServer(solrUrl);
-        }
-        return solrServer;
-    }
+    protected StringBuilder createSolrQuery()  {
+        StringBuilder queryBuilder = new StringBuilder(solrUrl);
 
-    protected SolrQuery createSolrQuery() {
-        SolrQuery solrQuery = new SolrQuery(query);
+        if (Strings.hasLength(requestHandler)) {
+            if (queryBuilder.charAt(queryBuilder.length() - 1) != '/') {
+                queryBuilder.append("/");
+            }
+            queryBuilder.append(requestHandler);
+        }
+
+        queryBuilder.append("?q=").append(encode(query)).append("&wt=json");
         if (filterQueries != null) {
-            solrQuery.setFilterQueries(filterQueries);
+            for (String filterQuery : filterQueries) {
+                queryBuilder.append("&fq=").append(encode(filterQuery));
+            }
         }
         if (fields != null) {
-            solrQuery.setFields(fields);
+            queryBuilder.append("&fl=");
+            for (int i = 0; i < fields.length; i++) {
+                if (i>0) {
+                    queryBuilder.append(encode(" "));
+                }
+                queryBuilder.append(encode(fields[i]));
+            }
         }
-        if (requestHandler != null) {
-            solrQuery.setRequestHandler(requestHandler);
+
+        queryBuilder.append("&rows=").append(rows);
+        return queryBuilder;
+    }
+
+    private static String encode(String value) {
+        try {
+            return URLEncoder.encode(value, "utf-8");
+        } catch (UnsupportedEncodingException e) {
+            throw new RuntimeException(e);
         }
-        solrQuery.setRows(rows);
-        return solrQuery;
     }
 
     @Override

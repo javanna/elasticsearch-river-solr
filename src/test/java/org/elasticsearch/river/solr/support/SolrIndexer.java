@@ -18,38 +18,80 @@
  */
 package org.elasticsearch.river.solr.support;
 
-import org.apache.solr.client.solrj.SolrServer;
-import org.apache.solr.client.solrj.SolrServerException;
-import org.apache.solr.common.SolrInputDocument;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.SerializationFeature;
+import org.apache.http.client.methods.CloseableHttpResponse;
+import org.apache.http.client.methods.HttpPost;
+import org.apache.http.entity.StringEntity;
+import org.apache.http.impl.client.CloseableHttpClient;
+import org.apache.http.impl.client.HttpClients;
+import org.apache.http.util.EntityUtils;
 
 import java.io.IOException;
+import java.text.DateFormat;
+import java.text.SimpleDateFormat;
 import java.util.Map;
+import java.util.TimeZone;
 
 public class SolrIndexer {
 
-    private final SolrServer solrServer;
+    private final CloseableHttpClient httpClient;
+    private final String solrUrl;
 
-    public SolrIndexer(SolrServer solrServer) {
-        this.solrServer = solrServer;
+    private final ObjectMapper objectMapper;
+
+    public SolrIndexer(String solrUrl) {
+        this.httpClient = HttpClients.createDefault();
+        this.solrUrl = solrUrl + "/update";
+        this.objectMapper = new ObjectMapper();
+        this.objectMapper.configure(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS, false);
+        DateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'");
+        dateFormat.setTimeZone(TimeZone.getTimeZone("UTC"));
+        objectMapper.setDateFormat(dateFormat);
     }
 
-    public void indexDocuments(Map<String, Iterable<Field>> documents) throws IOException, SolrServerException {
-        for (Iterable<Field> fields : documents.values()) {
-            solrServer.add(buildSolrInputDocument(fields));
+    public void indexDocuments(Map<String, Map<String, Object>> documents) throws IOException {
+        StringBuilder jsonBuilder = new StringBuilder("[");
+        int i=0;
+        for (Map<String, Object> doc : documents.values()) {
+            jsonBuilder.append(objectMapper.writeValueAsString(doc));
+
+            if (i < documents.values().size() - 1) {
+                jsonBuilder.append(",");
+            }
+            i++;
         }
-        solrServer.commit();
-    }
+        jsonBuilder.append("]");
 
-    private SolrInputDocument buildSolrInputDocument(Iterable<Field> fields) {
-        SolrInputDocument solrInputDocument = new SolrInputDocument();
-        for (Field<?> field : fields) {
-            solrInputDocument.setField(field.getName(), field.getValue());
+        HttpPost httpPost = new HttpPost(solrUrl + "?commit=true");
+        httpPost.setHeader("Content-type", "application/json");
+        httpPost.setEntity(new StringEntity(jsonBuilder.toString()));
+
+        CloseableHttpResponse response = httpClient.execute(httpPost);
+        try {
+            EntityUtils.consume(response.getEntity());
+            if (response.getStatusLine().getStatusCode() != 200) {
+                throw new RuntimeException("documents were not properly indexed");
+            }
+        } finally {
+            EntityUtils.consume(response.getEntity());
+            response.close();
         }
-        return solrInputDocument;
     }
 
-    public void clearDocuments() throws IOException, SolrServerException {
-        solrServer.deleteByQuery("*:*");
-        solrServer.commit();
+    public void clearDocuments() throws IOException {
+        HttpPost httpPost = new HttpPost(solrUrl + "?commit=true");
+        httpPost.setHeader("Content-type", "application/xml");
+        httpPost.setEntity(new StringEntity("<delete><query>*:*</query></delete>"));
+
+        CloseableHttpResponse response = httpClient.execute(httpPost);
+        try {
+            if (response.getStatusLine().getStatusCode() != 200) {
+                throw new RuntimeException("documents were not properly indexed");
+            }
+        } finally {
+            EntityUtils.consume(response.getEntity());
+            response.close();
+        }
     }
 }

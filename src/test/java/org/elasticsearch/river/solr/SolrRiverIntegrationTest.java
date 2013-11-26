@@ -18,14 +18,9 @@
  */
 package org.elasticsearch.river.solr;
 
-import java.io.File;
-import java.io.IOException;
-import java.util.*;
-
 import org.apache.commons.io.FileUtils;
 import org.apache.solr.client.solrj.SolrServerException;
 import org.apache.solr.client.solrj.embedded.JettySolrRunner;
-import org.apache.solr.client.solrj.impl.HttpSolrServer;
 import org.elasticsearch.action.admin.cluster.state.ClusterStateRequest;
 import org.elasticsearch.action.admin.indices.refresh.RefreshRequestBuilder;
 import org.elasticsearch.action.get.*;
@@ -56,6 +51,10 @@ import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
+
+import java.io.File;
+import java.io.IOException;
+import java.util.*;
 
 public class SolrRiverIntegrationTest {
 
@@ -93,7 +92,8 @@ public class SolrRiverIntegrationTest {
         System.setProperty("solr.data.dir", SOLR_DATA_DIR.getCanonicalPath());
         jettySolrRunner = new JettySolrRunner(solrHome.getAbsolutePath(), "/solr-river", 8983);
         jettySolrRunner.start();
-        solrIndexer = new SolrIndexer(new HttpSolrServer("http://localhost:8983/solr-river"));
+
+        solrIndexer = new SolrIndexer("http://localhost:8983/solr-river");
 
         //fires elasticsearch node
         Settings settings = ImmutableSettings.settingsBuilder()
@@ -114,11 +114,8 @@ public class SolrRiverIntegrationTest {
     }
 
     @BeforeMethod
-    public void beforeMethod() throws IOException, SolrServerException {
-        //removes data from elasticsearch (both registered river if existing and imported data)
-        String[] indices = esClient.admin().cluster().state(new ClusterStateRequest().local(true))
-                .actionGet().getState().getMetaData().getConcreteAllIndices();
-        esClient.admin().indices().prepareDelete(indices).execute().actionGet();
+    public void wipeData() throws IOException, SolrServerException {
+        esClient.admin().indices().prepareDelete("_all").execute().actionGet();
         //removes data from running solr
         solrIndexer.clearDocuments();
     }
@@ -126,7 +123,7 @@ public class SolrRiverIntegrationTest {
     @Test
     public void testImportDefaultValues() throws Exception {
 
-        Map<String, Iterable<Field>> documentsMap = documentGenerator.generateRandomDocuments();
+        Map<String, Map<String, Object>> documentsMap = documentGenerator.generateRandomDocuments();
         logger.info("Generated {} documents", documentsMap.size());
         solrIndexer.indexDocuments(documentsMap);
         logger.info("Indexed {} documents in Solr", documentsMap.size());
@@ -141,7 +138,7 @@ public class SolrRiverIntegrationTest {
     @Test
     public void testImportExistingIndex() throws Exception {
 
-        Map<String, Iterable<Field>> documentsMap = documentGenerator.generateRandomDocuments();
+        Map<String, Map<String, Object>> documentsMap = documentGenerator.generateRandomDocuments();
         logger.info("Generated {} documents", documentsMap.size());
         solrIndexer.indexDocuments(documentsMap);
         logger.info("Indexed {} documents in Solr", documentsMap.size());
@@ -158,7 +155,7 @@ public class SolrRiverIntegrationTest {
     @Test
     public void testImportWithRows() throws Exception {
 
-        Map<String, Iterable<Field>> documentsMap = documentGenerator.generateRandomDocuments();
+        Map<String, Map<String, Object>> documentsMap = documentGenerator.generateRandomDocuments();
         logger.info("Generated {} documents", documentsMap.size());
         solrIndexer.indexDocuments(documentsMap);
         logger.info("Indexed {} documents in Solr", documentsMap.size());
@@ -177,7 +174,7 @@ public class SolrRiverIntegrationTest {
     @Test
     public void testImportWithQuery() throws Exception {
 
-        Map<String, Iterable<Field>> documentsMap = documentGenerator.generateRandomDocuments();
+        Map<String, Map<String, Object>> documentsMap = documentGenerator.generateRandomDocuments();
         logger.info("Generated {} documents", documentsMap.size());
         solrIndexer.indexDocuments(documentsMap);
         logger.info("Indexed {} documents in Solr", documentsMap.size());
@@ -186,12 +183,12 @@ public class SolrRiverIntegrationTest {
 
         registerRiver(ImmutableMap.of("q", "keywords:" + keyword), null);
 
-        Map<String, Iterable<Field>> expectedDocuments = Maps.filterEntries(documentsMap, new Predicate<Map.Entry<String, Iterable<Field>>>() {
+        Map<String, Map<String, Object>> expectedDocuments = Maps.filterEntries(documentsMap, new Predicate<Map.Entry<String, Map<String, Object>>>() {
             @Override
-            public boolean apply(Map.Entry<String, Iterable<Field>> entry) {
-                for (Field field : entry.getValue()) {
-                    if ("keywords".equals(field.getName())) {
-                        return ((List)field.getValue()).contains(keyword);
+            public boolean apply(Map.Entry<String, Map<String, Object>> entry) {
+                for (Map.Entry<String, Object> stringObjectEntry : entry.getValue().entrySet()) {
+                    if ("keywords".equals(stringObjectEntry.getKey())) {
+                        return ((List)stringObjectEntry.getValue()).contains(keyword);
                     }
                 }
                 return false;
@@ -206,14 +203,14 @@ public class SolrRiverIntegrationTest {
     @Test
     public void testImportWhenNoDocsReturned() throws Exception {
         registerRiver();
-        checkMatchAllDocsSearchResponse(Collections.<String, Iterable<Field>>emptyMap());
+        checkMatchAllDocsSearchResponse(Collections.<String, Map<String, Object>>emptyMap());
         checkRiverClosedOnCompletion();
     }
 
     @Test
     public void testImportWithFilterQuery() throws Exception {
 
-        Map<String, Iterable<Field>> documentsMap = documentGenerator.generateRandomDocuments();
+        Map<String, Map<String, Object>> documentsMap = documentGenerator.generateRandomDocuments();
         logger.info("Generated {} documents", documentsMap.size());
         solrIndexer.indexDocuments(documentsMap);
         logger.info("Indexed {} documents in Solr", documentsMap.size());
@@ -224,17 +221,18 @@ public class SolrRiverIntegrationTest {
 
         registerRiver(ImmutableMap.of("fq", fq), null);
 
-        Map<String, Iterable<Field>> expectedDocuments = Maps.filterEntries(documentsMap, new Predicate<Map.Entry<String, Iterable<Field>>>() {
+        Map<String, Map<String, Object>> expectedDocuments = Maps.filterEntries(documentsMap, new Predicate<Map.Entry<String, Map<String, Object>>>() {
             @Override
-            public boolean apply(Map.Entry<String, Iterable<Field>> entry) {
+            public boolean apply(Map.Entry<String, Map<String, Object>> entry) {
                 boolean keywordMatch = false;
                 boolean categoryMatch = false;
-                for (Field field : entry.getValue()) {
-                    if ("keywords".equals(field.getName())) {
-                        keywordMatch = ((List) field.getValue()).contains(keyword);
+
+                for (Map.Entry<String, Object> stringObjectEntry : entry.getValue().entrySet()) {
+                    if ("keywords".equals(stringObjectEntry.getKey())) {
+                        keywordMatch = ((List) stringObjectEntry.getValue()).contains(keyword);
                     }
-                    if ("category".equals(field.getName())) {
-                        categoryMatch = category.equals(field.getValue());
+                    if ("category".equals(stringObjectEntry.getKey())) {
+                        categoryMatch = category.equals(stringObjectEntry.getValue());
                     }
                 }
                 return categoryMatch && keywordMatch;
@@ -249,7 +247,7 @@ public class SolrRiverIntegrationTest {
     @Test
     public void testImportWithFieldList() throws Exception {
 
-        Map<String, Iterable<Field>> documentsMap = documentGenerator.generateRandomDocuments();
+        Map<String, Map<String, Object>> documentsMap = documentGenerator.generateRandomDocuments();
         logger.info("Generated {} documents", documentsMap.size());
         solrIndexer.indexDocuments(documentsMap);
         logger.info("Indexed {} documents in Solr", documentsMap.size());
@@ -258,13 +256,13 @@ public class SolrRiverIntegrationTest {
         registerRiver(ImmutableMap.of("fl", fl), null);
 
         final List<String> flAsList = Arrays.asList(fl);
-        Map<String, Iterable<Field>> expectedDocuments = Maps.transformValues(documentsMap, new Function<Iterable<Field>, Iterable<Field>>() {
+        Map<String, Map<String, Object>> expectedDocuments = Maps.transformValues(documentsMap, new Function<Map<String, Object>, Map<String, Object>>() {
             @Override
-            public Iterable<Field> apply(Iterable<Field> fields) {
-                return Iterables.filter(fields, new Predicate<Field>() {
+            public Map<String, Object> apply(Map<String, Object> fields) {
+                return Maps.filterEntries(fields, new Predicate<Map.Entry<String, Object>>() {
                     @Override
-                    public boolean apply(Field field) {
-                        return flAsList.contains(field.getName());
+                    public boolean apply(Map.Entry<String, Object> stringObjectEntry) {
+                        return flAsList.contains(stringObjectEntry.getKey());
                     }
                 });
             }
@@ -278,7 +276,7 @@ public class SolrRiverIntegrationTest {
     @Test
     public void testImportWithQueryFilterQueryAndFieldList() throws Exception {
 
-        Map<String, Iterable<Field>> documentsMap = documentGenerator.generateRandomDocuments();
+        Map<String, Map<String, Object>> documentsMap = documentGenerator.generateRandomDocuments();
         logger.info("Generated {} documents", documentsMap.size());
         solrIndexer.indexDocuments(documentsMap);
         logger.info("Indexed {} documents in Solr", documentsMap.size());
@@ -292,18 +290,18 @@ public class SolrRiverIntegrationTest {
                                         "fq", "category:" + category,
                                         "fl", fl), null);
 
-        Map<String, Iterable<Field>> expectedDocumentsFiltered = Maps.filterEntries(documentsMap,
-                new Predicate<Map.Entry<String, Iterable<Field>>>() {
+        Map<String, Map<String, Object>> expectedDocumentsFiltered = Maps.filterEntries(documentsMap,
+                new Predicate<Map.Entry<String, Map<String, Object>>>() {
                     @Override
-                    public boolean apply(Map.Entry<String, Iterable<Field>> entry) {
+                    public boolean apply(Map.Entry<String, Map<String, Object>> entry) {
                         boolean keywordMatch = false;
                         boolean categoryMatch = false;
-                        for (Field field : entry.getValue()) {
-                            if ("keywords".equals(field.getName())) {
-                                keywordMatch = ((List) field.getValue()).contains(keyword);
+                        for (Map.Entry<String, Object> stringObjectEntry : entry.getValue().entrySet()) {
+                            if ("keywords".equals(stringObjectEntry.getKey())) {
+                                keywordMatch = ((List) stringObjectEntry.getValue()).contains(keyword);
                             }
-                            if ("category".equals(field.getName())) {
-                                categoryMatch = category.equals(field.getValue());
+                            if ("category".equals(stringObjectEntry.getKey())) {
+                                categoryMatch = category.equals(stringObjectEntry.getValue());
                             }
                         }
                         return categoryMatch && keywordMatch;
@@ -311,14 +309,14 @@ public class SolrRiverIntegrationTest {
                 });
 
         final List<String> flAsList = Arrays.asList(fl);
-        Map<String, Iterable<Field>>expectedDocuments = Maps.transformValues(expectedDocumentsFiltered,
-                new Function<Iterable<Field>, Iterable<Field>>() {
+        Map<String, Map<String, Object>>expectedDocuments = Maps.transformValues(expectedDocumentsFiltered,
+                new Function<Map<String, Object>, Map<String, Object>>() {
                     @Override
-                    public Iterable<Field> apply(Iterable<Field> fields) {
-                        return Iterables.filter(fields, new Predicate<Field>() {
+                    public Map<String, Object> apply(Map<String, Object> fields) {
+                        return Maps.filterEntries(fields, new Predicate<Map.Entry<String, Object>>() {
                             @Override
-                            public boolean apply(Field field) {
-                                return flAsList.contains(field.getName());
+                            public boolean apply(Map.Entry<String, Object> stringObjectEntry) {
+                                return flAsList.contains(stringObjectEntry.getKey());
                             }
                         });
                     }
@@ -332,7 +330,7 @@ public class SolrRiverIntegrationTest {
     @Test
     public void testImportWithUniqueKey() throws Exception {
 
-        Map<String, Iterable<Field>> documentsMap = documentGenerator.generateRandomDocuments();
+        Map<String, Map<String, Object>> documentsMap = documentGenerator.generateRandomDocuments();
         logger.info("Generated {} documents", documentsMap.size());
         solrIndexer.indexDocuments(documentsMap);
         logger.info("Indexed {} documents in Solr", documentsMap.size());
@@ -347,7 +345,7 @@ public class SolrRiverIntegrationTest {
     @Test
     public void testImportWithMapping() throws Exception {
 
-        Map<String, Iterable<Field>> documentsMap = documentGenerator.generateRandomDocuments();
+        Map<String, Map<String, Object>> documentsMap = documentGenerator.generateRandomDocuments();
         logger.info("Generated {} documents", documentsMap.size());
         solrIndexer.indexDocuments(documentsMap);
         logger.info("Indexed {} documents in Solr", documentsMap.size());
@@ -374,13 +372,13 @@ public class SolrRiverIntegrationTest {
         QueryBuilder queryBuilder = QueryBuilders.queryString("keywords_stored:" + keyword);
         SearchRequestBuilder searchRequestBuilder = esClient.prepareSearch("solr").setQuery(queryBuilder);
 
-        Map<String, Iterable<Field>> expectedDocumentsMap = Maps.filterEntries(documentsMap,
-                new Predicate<Map.Entry<String, Iterable<Field>>>() {
+        Map<String, Map<String, Object>> expectedDocumentsMap = Maps.filterEntries(documentsMap,
+                new Predicate<Map.Entry<String, Map<String, Object>>>() {
                     @Override
-                    public boolean apply(Map.Entry<String, Iterable<Field>> entry) {
-                        for (Field field : entry.getValue()) {
-                            if ("keywords".equals(field.getName())) {
-                                return ((List)field.getValue()).contains(keyword);
+                    public boolean apply(Map.Entry<String, Map<String, Object>> entry) {
+                        for (Map.Entry<String, Object> stringObjectEntry : entry.getValue().entrySet()) {
+                            if ("keywords".equals(stringObjectEntry.getKey())) {
+                                return ((List)stringObjectEntry.getValue()).contains(keyword);
                             }
                         }
                         return false;
@@ -394,7 +392,7 @@ public class SolrRiverIntegrationTest {
     @Test
     public void testImportWithIndexAndType() throws Exception {
 
-        Map<String, Iterable<Field>> documentsMap = documentGenerator.generateRandomDocuments();
+        Map<String, Map<String, Object>> documentsMap = documentGenerator.generateRandomDocuments();
         logger.info("Generated {} documents", documentsMap.size());
         solrIndexer.indexDocuments(documentsMap);
         logger.info("Indexed {} documents in Solr", documentsMap.size());
@@ -409,7 +407,7 @@ public class SolrRiverIntegrationTest {
     @Test
     public void testImportWithShardsAndReplicas() throws Exception {
 
-        Map<String, Iterable<Field>> documentsMap = documentGenerator.generateRandomDocuments();
+        Map<String, Map<String, Object>> documentsMap = documentGenerator.generateRandomDocuments();
         logger.info("Generated {} documents", documentsMap.size());
         solrIndexer.indexDocuments(documentsMap);
         logger.info("Indexed {} documents in Solr", documentsMap.size());
@@ -434,7 +432,7 @@ public class SolrRiverIntegrationTest {
     @Test
     public void testImportWithBulkSize() throws Exception {
 
-        Map<String, Iterable<Field>> documentsMap = documentGenerator.generateRandomDocuments();
+        Map<String, Map<String, Object>> documentsMap = documentGenerator.generateRandomDocuments();
         logger.info("Generated {} documents", documentsMap.size());
         solrIndexer.indexDocuments(documentsMap);
         logger.info("Indexed {} documents in Solr", documentsMap.size());
@@ -452,7 +450,7 @@ public class SolrRiverIntegrationTest {
     @Test
     public void testImportNotClosedOnCompletion() throws Exception {
 
-        Map<String, Iterable<Field>> documentsMap = documentGenerator.generateRandomDocuments();
+        Map<String, Map<String, Object>> documentsMap = documentGenerator.generateRandomDocuments();
         logger.info("Generated {} documents", documentsMap.size());
         solrIndexer.indexDocuments(documentsMap);
         logger.info("Indexed {} documents in Solr", documentsMap.size());
@@ -467,20 +465,20 @@ public class SolrRiverIntegrationTest {
     @Test
     public void testImportWithScript() throws Exception {
 
-        Map<String, Iterable<Field>> documentsMap = documentGenerator.generateRandomDocuments();
+        Map<String, Map<String, Object>> documentsMap = documentGenerator.generateRandomDocuments();
         logger.info("Generated {} documents", documentsMap.size());
         solrIndexer.indexDocuments(documentsMap);
         logger.info("Indexed {} documents in Solr", documentsMap.size());
 
         //running a script that always removes the title field
 
-        Map<String, Iterable<Field>> expectedDocuments = Maps.transformValues(documentsMap, new Function<Iterable<Field>, Iterable<Field>>() {
+        Map<String, Map<String, Object>> expectedDocuments = Maps.transformValues(documentsMap, new Function<Map<String, Object>, Map<String, Object>>() {
             @Override
-            public Iterable<Field> apply(Iterable<Field> fields) {
-                return Iterables.filter(fields, new Predicate<Field>() {
+            public Map<String, Object> apply(Map<String, Object> fields) {
+                return Maps.filterEntries(fields, new Predicate<Map.Entry<String, Object>>() {
                     @Override
-                    public boolean apply(Field field) {
-                        return !"title".equals(field.getName());
+                    public boolean apply(Map.Entry<String, Object> stringObjectEntry) {
+                        return !"title".equals(stringObjectEntry.getKey());
                     }
                 });
             }
@@ -496,20 +494,20 @@ public class SolrRiverIntegrationTest {
     @Test
     public void testImportWithScriptAndParams() throws Exception {
 
-        Map<String, Iterable<Field>> documentsMap = documentGenerator.generateRandomDocuments();
+        Map<String, Map<String, Object>> documentsMap = documentGenerator.generateRandomDocuments();
         logger.info("Generated {} documents", documentsMap.size());
         solrIndexer.indexDocuments(documentsMap);
         logger.info("Indexed {} documents in Solr", documentsMap.size());
 
         //running a script that always removes the title field
 
-        Map<String, Iterable<Field>> expectedDocuments = Maps.transformValues(documentsMap, new Function<Iterable<Field>, Iterable<Field>>() {
+        Map<String, Map<String, Object>> expectedDocuments = Maps.transformValues(documentsMap, new Function<Map<String, Object>, Map<String, Object>>() {
             @Override
-            public Iterable<Field> apply(Iterable<Field> fields) {
-                return Iterables.filter(fields, new Predicate<Field>() {
+            public Map<String, Object> apply(Map<String, Object> fields) {
+                return Maps.filterEntries(fields, new Predicate<Map.Entry<String, Object>>() {
                     @Override
-                    public boolean apply(Field field) {
-                        return !"title".equals(field.getName());
+                    public boolean apply(Map.Entry<String, Object> stringObjectEntry) {
+                        return !"title".equals(stringObjectEntry.getKey());
                     }
                 });
             }
@@ -535,15 +533,15 @@ public class SolrRiverIntegrationTest {
         Assert.assertTrue(esClient.admin().indices().prepareExists("_river").execute().actionGet().isExists());
     }
 
-    private void checkMultiGetResponse(Map<String, Iterable<Field>> expectedDocumentsMap) {
+    private void checkMultiGetResponse(Map<String, Map<String, Object>> expectedDocumentsMap) {
         checkMultiGetResponse(expectedDocumentsMap, SolrRiver.DEFAULT_UNIQUE_KEY);
     }
 
-    private void checkMultiGetResponse(Map<String, Iterable<Field>> expectedDocumentsMap, String uniqueKeyField) {
+    private void checkMultiGetResponse(Map<String, Map<String, Object>> expectedDocumentsMap, String uniqueKeyField) {
         checkMultiGetResponse(expectedDocumentsMap, "solr", "import", uniqueKeyField);
     }
 
-    private void checkMultiGetResponse(Map<String, Iterable<Field>> expectedDocumentsMap, String index, String type) {
+    private void checkMultiGetResponse(Map<String, Map<String, Object>> expectedDocumentsMap, String index, String type) {
         checkMultiGetResponse(expectedDocumentsMap, index, type, SolrRiver.DEFAULT_UNIQUE_KEY);
     }
 
@@ -559,7 +557,7 @@ public class SolrRiverIntegrationTest {
         Assert.assertFalse(getResponse.isExists());
     }
 
-    private void checkMultiGetResponse(Map<String, Iterable<Field>> expectedDocumentsMap,
+    private void checkMultiGetResponse(Map<String, Map<String, Object>> expectedDocumentsMap,
                                        String index, String type, String uniqueKeyField) {
 
         //each multiget requests a maximum of 10 docs
@@ -576,24 +574,24 @@ public class SolrRiverIntegrationTest {
             for (MultiGetItemResponse multiGetItemResponse : multiGetResponse) {
                 Assert.assertFalse(multiGetItemResponse.isFailed());
                 GetResponse getResponse = multiGetItemResponse.getResponse();
-                Iterable<Field> expectedDocument = expectedDocumentsMap.get(getResponse.getId());
-                assertDocumentsEquals(getResponse, expectedDocument, uniqueKeyField);
+                Map<String, Object> stringObjectMap = expectedDocumentsMap.get(getResponse.getId());
+                assertDocumentsEquals(getResponse, stringObjectMap, uniqueKeyField);
             }
         }
     }
 
-    private void checkMatchAllDocsSearchResponse(Map<String, Iterable<Field>> expectedDocumentsMap) {
+    private void checkMatchAllDocsSearchResponse(Map<String, Map<String, Object>> expectedDocumentsMap) {
         checkMatchAllDocsSearchResponse(expectedDocumentsMap, "solr", "import");
     }
 
-    private void checkMatchAllDocsSearchResponse(Map<String, Iterable<Field>> expectedDocumentsMap, String index, String type) {
+    private void checkMatchAllDocsSearchResponse(Map<String, Map<String, Object>> expectedDocumentsMap, String index, String type) {
         refreshIndex(index);
         SearchRequestBuilder searchRequestBuilder = esClient.prepareSearch(index).setTypes(type);
         SearchResponse searchResponse = search(searchRequestBuilder);
         Assert.assertEquals(searchResponse.getHits().totalHits(), expectedDocumentsMap.size());
     }
 
-    private void checkSearchResponse(Map<String, Iterable<Field>> expectedDocumentsMap, SearchRequestBuilder searchRequestBuilder) {
+    private void checkSearchResponse(Map<String, Map<String, Object>> expectedDocumentsMap, SearchRequestBuilder searchRequestBuilder) {
         refreshIndex("solr");
         SearchResponse searchResponse = search(searchRequestBuilder);
         Assert.assertEquals(searchResponse.getHits().totalHits(), expectedDocumentsMap.size());
@@ -609,22 +607,23 @@ public class SolrRiverIntegrationTest {
                 new CheckSearchResponseCallback());
     }
 
-    private static void assertDocumentsEquals(GetResponse getResponse, Iterable<Field> expectedDocument, String uniqueKeyFieldName) {
+    private static void assertDocumentsEquals(GetResponse getResponse, Map<String, Object> expectedDocument, String uniqueKeyFieldName) {
         Assert.assertTrue(getResponse.isExists());
         Map<String, Object> responseMap = getResponse.getSourceAsMap();
         Assert.assertNotNull(responseMap);
 
         int count = 0;
-        for (Field field : expectedDocument) {
+
+        for (Map.Entry<String, Object> entry : expectedDocument.entrySet()) {
             //the id is not included in the responseMap and already verified since used as key to retrieve the doc
-            if (uniqueKeyFieldName.equals(field.getName())) {
+            if (uniqueKeyFieldName.equals(entry.getKey())) {
                 continue;
             }
 
-            Object actualValue = responseMap.get(field.getName());
-            Assert.assertNotNull(actualValue, field.getName() + " field is null");
+            Object actualValue = responseMap.get(entry.getKey());
+            Assert.assertNotNull(actualValue, entry.getKey() + " field is null");
 
-            Object expectedValue = field.getValue();
+            Object expectedValue = entry.getValue();
             if (expectedValue instanceof Date) {
                 //the source contains the date as String, we need to parse it
                 Date actualDate = DateFieldMapper.Defaults.DATE_TIME_FORMATTER.parser().parseDateTime(actualValue.toString()).toDate();

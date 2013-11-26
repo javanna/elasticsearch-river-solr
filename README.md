@@ -14,17 +14,21 @@ Versions
 	<thead>
 		<tr>
 			<td>Solr River Plugin</td>
-			<td>ElasticSearch</td>
+			<td>Elasticsearch</td>
 		</tr>
 	</thead>
 	<tbody>
-	   <tr>
+	    <tr>
         	<td>master</td>
-            <td>0.90.0</td>
+            <td>0.90.x</td>
+        </tr>
+        <tr>
+            <td><a href="http://bit.ly/1exH5mG">1.1</a></td>
+            <td>0.90.x</td>
         </tr>
         <tr>
             <td><a href="http://bit.ly/10ioSk0">1.0.4</a></td>
-            <td>0.90.0 -> master</td>
+            <td>0.90.0</td>
         </tr>
 	    <tr>
     	    <td><a href="http://bit.ly/12rmrSN">1.0.3</a></td>
@@ -46,17 +50,11 @@ Versions
 </table>
 
 
-You might be able to use the river with older versions of elasticsearch, but the tests included with the project run successfully only with version 0.19.3 or higher, the first version using Lucene 3.6.
-
 Getting Started
 ===============
 
 The Solr River allows to query a running Solr instance and index the returned documents in elasticsearch.
-It uses the [Solrj](http://wiki.apache.org/solr/Solrj) library to communicate with Solr.
-
-It's recommended that the solrj version used is the same as the solr version installed on the server that the river is querying.
-The Solrj version in use and distributed with the plugin is 3.6.1. Anyway, it's possible to query other Solr versions.
-The default format used is in fact [javabin](http://wiki.apache.org/solr/javabin) but you can solve compatibility issues just switching to the xml format using the wt parameter.
+It retrieves documents via [json response writer](http://wiki.apache.org/solr/SolJSON), through http get requests (solrj is not used anymore to communicate with Solr).
 
 All the [common query parameters](http://wiki.apache.org/solr/CommonQueryParameters) are supported.
 
@@ -90,8 +88,7 @@ All supported parameters are optional. The following example request contains al
         "url" : "http://localhost:8983/solr/",
         "q" : "*:*",
         "fq" : "",
-        "fl" : "",
-        "wt" : "javabin",
+        "fl" : ""
         "qt" : "",
         "uniqueKey" : "id",
         "rows" : 10
@@ -156,7 +153,7 @@ License
 ```
 This software is licensed under the Apache 2 license, quoted below.
 
-Copyright 2012 Luca Cavanna
+Copyright 2013 Luca Cavanna
 
 Licensed under the Apache License, Version 2.0 (the "License"); you may not
 use this file except in compliance with the License. You may obtain a copy of
