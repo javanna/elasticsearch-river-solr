@@ -3,7 +3,7 @@ Solr River Plugin for ElasticSearch [![Build Status](https://buildhive.cloudbees
 
 The Solr River plugin allows to import data from [Apache Solr](http://lucene.apache.org/solr) to [elasticsearch](http://www.elasticsearch.org).
 
-In order to install the latest version of the plugin, simply run: `bin/plugin install river-solr -url http://bit.ly/1exH5mG`.
+In order to install the latest version of the plugin, simply run: `bin/plugin install river-solr -url http://bit.ly/1grj1ny`.
 You can copy paste the url of a specific version from the table below, depending on the elasticsearch version you're running.
 
 
@@ -19,8 +19,12 @@ Versions
 	</thead>
 	<tbody>
 	    <tr>
-        	<td>master</td>
-            <td>0.90.x</td>
+            <td>master</td>
+            <td>1.0.x</td>
+        </tr>
+        <tr>
+            <td><a href ="http://bit.ly/1grj1ny">2.0</a></td>
+            <td>1.0.x</td>
         </tr>
         <tr>
             <td><a href="http://bit.ly/1exH5mG">1.1</a></td>
@@ -59,7 +63,7 @@ It retrieves documents via [json response writer](http://wiki.apache.org/solr/So
 All the [common query parameters](http://wiki.apache.org/solr/CommonQueryParameters) are supported.
 
 The solr river is not meant to keep solr and elasticsearch in sync, that's why it automatically deletes itself on completion, so that the river doesn't start up again at every node restart.
-This is the default behaviour, which can be disabled through the close_on_completion parameter.
+This is the default behaviour, which can be disabled through the `close_on_completion` parameter.
 
 
 Installation
@@ -153,7 +157,7 @@ License
 ```
 This software is licensed under the Apache 2 license, quoted below.
 
-Copyright 2013 Luca Cavanna
+Copyright 2014 Luca Cavanna
 
 Licensed under the Apache License, Version 2.0 (the "License"); you may not
 use this file except in compliance with the License. You may obtain a copy of
