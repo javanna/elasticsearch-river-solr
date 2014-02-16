@@ -27,7 +27,7 @@ import org.apache.http.client.methods.HttpGet;
 import org.apache.http.impl.client.CloseableHttpClient;
 import org.apache.http.impl.client.HttpClients;
 import org.apache.http.util.EntityUtils;
-import org.elasticsearch.ElasticSearchIllegalArgumentException;
+import org.elasticsearch.ElasticsearchIllegalArgumentException;
 import org.elasticsearch.action.admin.indices.create.CreateIndexRequestBuilder;
 import org.elasticsearch.action.bulk.BulkProcessor;
 import org.elasticsearch.action.bulk.BulkRequest;
@@ -325,7 +325,7 @@ public class SolrRiver extends AbstractRiverComponent implements River {
             executableScript.run();
             ctx = (Map<String, Object>) executableScript.unwrap(ctx);
         } catch (Exception e) {
-            throw new ElasticSearchIllegalArgumentException("failed to execute script", e);
+            throw new ElasticsearchIllegalArgumentException("failed to execute script", e);
         }
 
         final Map<String, Object> updatedSourceAsMap = (Map<String, Object>) ctx.get("_source");

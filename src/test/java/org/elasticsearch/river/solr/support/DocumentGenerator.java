@@ -18,18 +18,21 @@
  */
 package org.elasticsearch.river.solr.support;
 
-import java.util.*;
+import org.apache.commons.lang.RandomStringUtils;
 
-import static org.elasticsearch.river.solr.support.Random.*;
+import java.util.*;
 
 public class DocumentGenerator {
 
     private static final int DEFAULT_MAX_NUMBER_OF_DOCUMENTS = 500;
 
+    private final Random random;
+
     private final List<String> availableKeywords;
     private final List<String> availableCategories;
 
-    public DocumentGenerator() {
+    public DocumentGenerator(long seed) {
+        this.random = new Random(seed);
         availableKeywords = new ArrayList<String>();
         for (int i = 0; i < 20; i++) {
             availableKeywords.add("keyword" + nextWord());
@@ -42,7 +45,7 @@ public class DocumentGenerator {
     }
 
     public Map<String, Map<String, Object>> generateRandomDocuments() {
-        return generateDocuments(nextInt(DEFAULT_MAX_NUMBER_OF_DOCUMENTS));
+        return generateDocuments(random.nextInt(DEFAULT_MAX_NUMBER_OF_DOCUMENTS));
     }
 
     private Map<String, Map<String, Object>> generateDocuments(int count) {
@@ -59,25 +62,25 @@ public class DocumentGenerator {
         fields.put("id", uniqueKeyFieldValue);
         fields.put("id_test", uniqueKeyFieldValue);
 
-        if (nextBoolean()) {
+        if (random.nextBoolean()) {
             fields.put("title", nextSentence(5));
         }
-        if (nextBoolean()) {
+        if (random.nextBoolean()) {
             fields.put("description", nextSentence(15));
         }
-        if (nextBoolean()) {
-            int numKeywords = nextInt(5);
+        if (random.nextBoolean()) {
+            int numKeywords = random.nextInt(5);
             List<String> keywords = new ArrayList<String>();
             for (int i = 0; i < numKeywords; i++) {
-                keywords.add(availableKeywords.get(nextInt(availableKeywords.size() - 1)));
+                keywords.add(availableKeywords.get(random.nextInt(availableKeywords.size() - 1)));
             }
             if (!keywords.isEmpty()) {
                 fields.put("keywords", keywords);
             }
         }
 
-        if (nextBoolean()) {
-            fields.put("category", availableCategories.get(nextInt(availableCategories.size() - 1)));
+        if (random.nextBoolean()) {
+            fields.put("category", availableCategories.get(random.nextInt(availableCategories.size() - 1)));
         }
 
         fields.put("publish_date", nextDate());
@@ -91,5 +94,29 @@ public class DocumentGenerator {
 
     public List<String> getAvailableCategories() {
         return availableCategories;
+    }
+
+
+    public String nextSentence(int numberOfWords) {
+        //0 to numberOfWords number of words for each sentence
+        StringBuilder builder = new StringBuilder();
+        for (int i = 0; i < random.nextInt(numberOfWords); i++) {
+            builder.append(nextWord()).append(" ");
+        }
+        return builder.toString();
+    }
+
+    public String nextWord() {
+        //1 to 10 number of characters for each random word
+        return RandomStringUtils.random(random.nextInt(9) + 1, 0, 0, true, false, null, random);
+    }
+
+    public Date nextDate() {
+        int month = random.nextInt(11) + 1;
+        int year = random.nextInt(30) + 1980;
+        int date = random.nextInt(365);
+        Calendar calendar = Calendar.getInstance();
+        calendar.set(year, month, date);
+        return calendar.getTime();
     }
 }

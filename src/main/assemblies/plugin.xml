@@ -10,11 +10,9 @@
             <outputDirectory>/</outputDirectory>
             <includes>
                 <include>org.elasticsearch:elasticsearch-river-solr</include>
-                <include>org.apache.solr:solr-solrj</include>
                 <include>org.apache.httpcomponents:*</include>
                 <include>commons-logging:commons-logging</include>
                 <include>com.fasterxml.jackson.core:*</include>
-                <include>org.slf4j:*</include>
             </includes>
         </dependencySet>
     </dependencySets>

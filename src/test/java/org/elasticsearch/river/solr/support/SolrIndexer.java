@@ -87,7 +87,7 @@ public class SolrIndexer {
         CloseableHttpResponse response = httpClient.execute(httpPost);
         try {
             if (response.getStatusLine().getStatusCode() != 200) {
-                throw new RuntimeException("documents were not properly indexed");
+                throw new RuntimeException("documents were not properly cleared");
             }
         } finally {
             EntityUtils.consume(response.getEntity());
