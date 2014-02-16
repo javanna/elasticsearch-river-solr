@@ -53,7 +53,6 @@ import java.util.Arrays;
 import java.util.Date;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.TimeUnit;
 
 import static org.hamcrest.CoreMatchers.equalTo;
 import static org.hamcrest.CoreMatchers.notNullValue;
@@ -503,7 +502,7 @@ public class SolrRiverIntegrationTest extends ElasticsearchIntegrationTest {
             public boolean apply(Object o) {
                 return !client().prepareGet("_river", "solr_river", "_meta").get().isExists();
             }
-        }, 5, TimeUnit.SECONDS), equalTo(true));
+        }), equalTo(true));
         assertThat(client().admin().indices().prepareExists("_river").get().isExists(), equalTo(true));
     }
 
@@ -534,7 +533,7 @@ public class SolrRiverIntegrationTest extends ElasticsearchIntegrationTest {
                 SearchResponse searchResponse = client().prepareSearch(index).setSearchType(SearchType.COUNT).get();
                 return searchResponse.getHits().getTotalHits() == expectedCount;
             }
-        }, 5, TimeUnit.SECONDS), equalTo(true));
+        }), equalTo(true));
     }
 
     private static void assertDocumentsEquals(GetResponse getResponse, Map<String, Object> expectedDocument, String uniqueKeyFieldName) {
