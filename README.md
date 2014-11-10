@@ -20,11 +20,11 @@ Versions
 	<tbody>
 	    <tr>
             <td>master</td>
-            <td>1.3.x</td>
+            <td>1.3.x -> 1.4.x</td>
         </tr>
         <tr>
             <td><a href ="http://bit.ly/1qzA7lB">2.1</a></td>
-            <td>1.3.x</td>
+            <td>1.3.x -> 1.4.x</td>
         </tr>
         <tr>
             <td><a href ="http://bit.ly/1grj1ny">2.0</a></td>
