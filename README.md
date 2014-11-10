@@ -3,7 +3,7 @@ Solr River Plugin for ElasticSearch [![Build Status](https://buildhive.cloudbees
 
 The Solr River plugin allows to import data from [Apache Solr](http://lucene.apache.org/solr) to [elasticsearch](http://www.elasticsearch.org).
 
-In order to install the latest version of the plugin, simply run: `bin/plugin install river-solr -url http://bit.ly/1grj1ny`.
+In order to install the latest version of the plugin, simply run: `bin/plugin install river-solr -url http://bit.ly/1qzA7lB`.
 You can copy paste the url of a specific version from the table below, depending on the elasticsearch version you're running.
 
 
@@ -20,11 +20,15 @@ Versions
 	<tbody>
 	    <tr>
             <td>master</td>
-            <td>1.0.x</td>
+            <td>1.3.x</td>
+        </tr>
+        <tr>
+            <td><a href ="http://bit.ly/1qzA7lB">2.1</a></td>
+            <td>1.3.x</td>
         </tr>
         <tr>
             <td><a href ="http://bit.ly/1grj1ny">2.0</a></td>
-            <td>1.0.x</td>
+            <td>1.0.x -> 1.2.x</td>
         </tr>
         <tr>
             <td><a href="http://bit.ly/1exH5mG">1.1</a></td>
@@ -143,6 +147,7 @@ Since version 1.0.3 it's possible to transform the documents via scripting. The 
 ```
 
 The example above increments by 4 the content of the counter field for every document right before the indexing process in elasticsearch.
+Note that dynamic scripting needs to be enabled for the above to work.
 
 Limitations
 ------------
