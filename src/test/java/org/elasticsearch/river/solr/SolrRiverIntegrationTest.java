@@ -99,6 +99,9 @@ public class SolrRiverIntegrationTest extends ElasticsearchIntegrationTest {
     @AfterClass
     public static void close() throws Exception {
         jettySolrRunner.stop();
+        jettySolrRunner = null;
+        solrIndexer = null;
+        documentGenerator = null;
         FileUtils.deleteDirectory(DATA_DIR);
     }
 
