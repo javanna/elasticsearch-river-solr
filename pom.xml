@@ -32,10 +32,10 @@
     </distributionManagement>
 
     <properties>
-        <elasticsearch.version>1.0.0</elasticsearch.version>
+        <elasticsearch.version>1.3.0</elasticsearch.version>
         <!-- must match the lucene version used by elasticsearch
              and solr-core (only for testing)  -->
-        <lucene.version>4.6.1</lucene.version>
+        <lucene.version>4.9.0</lucene.version>
         <httpclient.version>4.3.2</httpclient.version>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <tests.jvms>1</tests.jvms>
@@ -76,6 +76,11 @@
             <artifactId>junit</artifactId>
             <version>4.10</version>
             <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.slf4j</groupId>
+            <artifactId>slf4j-api</artifactId>
+            <version>1.7.7</version>
         </dependency>
 
         <dependency>

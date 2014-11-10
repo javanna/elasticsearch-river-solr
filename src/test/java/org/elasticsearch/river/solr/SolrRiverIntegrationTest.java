@@ -86,7 +86,7 @@ public class SolrRiverIntegrationTest extends ElasticsearchIntegrationTest {
     }
 
     @BeforeClass
-    public static void beforeClass() throws Exception {
+    public static void init() throws Exception {
         documentGenerator = new DocumentGenerator(randomLong());
         //starts Solr server
         File solrHome = new File(Thread.currentThread().getContextClassLoader().getResource("solr/").toURI());
@@ -97,7 +97,7 @@ public class SolrRiverIntegrationTest extends ElasticsearchIntegrationTest {
     }
 
     @AfterClass
-    public static void afterClass() throws Exception {
+    public static void close() throws Exception {
         jettySolrRunner.stop();
         FileUtils.deleteDirectory(DATA_DIR);
     }

@@ -320,7 +320,7 @@ public class SolrRiver extends AbstractRiverComponent implements River {
         ctx.put("_source", sourceAndContent.v2());
 
         try {
-            ExecutableScript executableScript = scriptService.executable(scriptLang, script, scriptParams);
+            ExecutableScript executableScript = scriptService.executable(scriptLang, script, ScriptService.ScriptType.INLINE, scriptParams);
             executableScript.setNextVar("ctx", ctx);
             executableScript.run();
             ctx = (Map<String, Object>) executableScript.unwrap(ctx);
