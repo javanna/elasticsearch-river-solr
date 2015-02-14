@@ -18,10 +18,16 @@
  */
 package org.elasticsearch.river.solr;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.SerializationFeature;
-import com.fasterxml.jackson.databind.node.ObjectNode;
+import java.io.IOException;
+import java.io.UnsupportedEncodingException;
+import java.net.URLEncoder;
+import java.nio.charset.Charset;
+import java.util.HashMap;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.atomic.AtomicInteger;
+
 import org.apache.http.client.methods.CloseableHttpResponse;
 import org.apache.http.client.methods.HttpGet;
 import org.apache.http.impl.client.CloseableHttpClient;
@@ -49,15 +55,10 @@ import org.elasticsearch.river.RiverSettings;
 import org.elasticsearch.script.ExecutableScript;
 import org.elasticsearch.script.ScriptService;
 
-import java.io.IOException;
-import java.io.UnsupportedEncodingException;
-import java.net.URLEncoder;
-import java.nio.charset.Charset;
-import java.util.HashMap;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Map;
-import java.util.concurrent.atomic.AtomicInteger;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.SerializationFeature;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 
 /**
  * Solr river which allows to index data taken from a running Solr instance
@@ -74,6 +75,7 @@ public class SolrRiver extends AbstractRiverComponent implements River {
     private final String[] fields;
     private final String requestHandler;
     private final String uniqueKey;
+    private final boolean useCursor;
     private final int rows;
 
     private final String indexName;
@@ -93,6 +95,7 @@ public class SolrRiver extends AbstractRiverComponent implements River {
     private final CloseableHttpClient httpClient;
 
     static final String DEFAULT_UNIQUE_KEY = "id";
+    static final String USE_CURSOR_PARAM = "useCursor";
 
     @Inject
     @SuppressWarnings("unchecked")
@@ -106,6 +109,7 @@ public class SolrRiver extends AbstractRiverComponent implements River {
         String url = "http://localhost:8983/solr/";
         String q = "*:*";
         String uniqueKey = DEFAULT_UNIQUE_KEY;
+        boolean useCursor = false; 
         int rows = 10;
         String qt = "select";
         String[] fq, fl;
@@ -119,11 +123,13 @@ public class SolrRiver extends AbstractRiverComponent implements River {
             fl = readArrayOrString(solrSettings.get("fl"));
             qt = XContentMapValues.nodeStringValue(solrSettings.get("qt"), qt);
             uniqueKey = XContentMapValues.nodeStringValue(solrSettings.get("uniqueKey"), uniqueKey);
+            useCursor = XContentMapValues.nodeBooleanValue(solrSettings.get(USE_CURSOR_PARAM), useCursor);
         }
         this.solrUrl = url;
         this.query = q;
         this.rows = rows;
         this.uniqueKey = uniqueKey;
+        this.useCursor = useCursor;
         this.filterQueries = fq;
         this.fields = fl;
         this.requestHandler = qt;
@@ -224,9 +230,16 @@ public class SolrRiver extends AbstractRiverComponent implements River {
         StringBuilder baseSolrQuery = createSolrQuery();
 
         Long numFound = null;
-        int startParam;
-        while ((startParam = start.getAndAdd(rows)) == 0 || startParam < numFound) {
-            String solrQuery = baseSolrQuery.toString() + "&start=" + startParam;
+        String cursorMark = "*";
+        String nextCursorMark = "";
+        boolean finished = false;
+        int startParam = start.get();
+
+        while (!finished) {
+            String queryPagingParam = useCursor ? 
+                    "&cursorMark=" + cursorMark + "&sort=" + uniqueKey + "+asc" 
+                    : "&start=" + startParam;
+            String solrQuery = baseSolrQuery.toString() + queryPagingParam;
             CloseableHttpResponse httpResponse = null;
             try {
                 logger.info("Sending query to Solr: {}", solrQuery);
@@ -242,6 +255,25 @@ public class SolrRiver extends AbstractRiverComponent implements River {
                 JsonNode response = jsonNode.get("response");
                 JsonNode numFoundNode = response.get("numFound");
                 numFound = numFoundNode.asLong();
+                if (useCursor) {
+                    JsonNode nextCursorMarkNode = jsonNode
+                            .get("nextCursorMark");
+                    if (nextCursorMarkNode == null) {
+                        throw new RuntimeException(
+                                "No nextCursorMark found in SolR response!"
+                                        + " Cursor came only with SolR 4.7 and above."
+                                        + " You should retry the import after removing the"
+                                        + " 'solr." + USE_CURSOR_PARAM
+                                        + "' parameter in river declaration.");
+                    }
+                    nextCursorMark = nextCursorMarkNode.asText();
+                }
+                
+                finished = useCursor ? 
+                        cursorMark.equals(nextCursorMark) 
+                        : !((startParam = start.addAndGet(rows)) == 0 || startParam < numFound);
+                cursorMark = nextCursorMark;
+                
                 if (logger.isWarnEnabled() && numFound == 0) {
                     logger.warn("The solr query {} returned 0 documents", solrQuery);
                 }

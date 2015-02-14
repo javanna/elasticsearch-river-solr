@@ -99,7 +99,8 @@ All supported parameters are optional. The following example request contains al
         "fl" : ""
         "qt" : "",
         "uniqueKey" : "id",
-        "rows" : 10
+        "rows" : 10,
+        "useCursor" : false
     },
     "index" : {
         "index" : "solr",
@@ -113,6 +114,8 @@ All supported parameters are optional. The following example request contains al
 ```
 
 The fq and fl parameters can be provided as either an array or a single value.
+
+The useCursor parameter [greatly improves performances](https://lucidworks.com/blog/coming-soon-to-solr-efficient-cursor-based-iteration-of-large-result-sets/) especially with deep pagination, but is only compatible with [SolR version 4.7+](https://issues.apache.org/jira/browse/SOLR-5463).
 
 You can provide your own mapping while creating the river, as well as the index settings, which will be used when creating the new index if needed.
 
