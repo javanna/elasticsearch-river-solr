@@ -1,7 +1,10 @@
-Solr River Plugin for ElasticSearch [![Build Status](https://buildhive.cloudbees.com/job/javanna/job/elasticsearch-river-solr/badge/icon)](https://buildhive.cloudbees.com/job/javanna/job/elasticsearch-river-solr/) [![Build Status](https://travis-ci.org/javanna/elasticsearch-river-solr.png)](https://travis-ci.org/javanna/elasticsearch-river-solr) [![Build Status](https://drone.io/github.com/javanna/elasticsearch-river-solr/status.png)](https://drone.io/github.com/javanna/elasticsearch-river-solr/latest)
+Solr River Plugin for ElasticSearch 
 ==================================
 
 The Solr River plugin allows to import data from [Apache Solr](http://lucene.apache.org/solr) to [elasticsearch](http://www.elasticsearch.org).
+
+Deprecation warning: rivers are deprecated in elasticsearch, hence the Solr River plugin is not maintained anymore. Read [this article](https://www.elastic.co/blog/deprecating_rivers) for more info on the rivers deprecation.
+-----------------------------------------
 
 In order to install the latest version of the plugin, simply run: `bin/plugin install river-solr -url http://bit.ly/1qzA7lB`.
 You can copy paste the url of a specific version from the table below, depending on the elasticsearch version you're running.
@@ -162,7 +165,7 @@ License
 ```
 This software is licensed under the Apache 2 license, quoted below.
 
-Copyright 2014 Luca Cavanna
+Copyright 2015 Luca Cavanna
 
 Licensed under the Apache License, Version 2.0 (the "License"); you may not
 use this file except in compliance with the License. You may obtain a copy of
